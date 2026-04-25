@@ -1,0 +1,68 @@
+@page "/"
+
+<PageTitle>Home</PageTitle>
+
+<MudText Typo="Typo.h2" GutterBottom="true" Class="mb-6">Welcome to MudBlazor Editor</MudText>
+
+<MudGrid>
+    <MudItem xs="12" sm="6">
+        <MudCard>
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h5">🏠 Home</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText>This is the home page of your Blazor WebAssembly application built with MudBlazor Material Design components.</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6">
+        <MudCard>
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h5">✨ Features</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudList T="string">
+                    <MudListItem Text="Light/Dark Mode Toggle" Icon="@Icons.Material.Filled.Brightness4" />
+                    <MudListItem Text="Responsive Navigation" Icon="@Icons.Material.Filled.Menu" />
+                    <MudListItem Text="Material Design Components" Icon="@Icons.Material.Filled.Palette" />
+                </MudList>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6">
+        <MudCard>
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h5">📊 Pages</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText Class="mb-2">Navigate to:</MudText>
+                <MudLink Href="counter">Counter Page</MudLink>
+                <br />
+                <MudLink Href="weather">Weather Page</MudLink>
+                <br />
+                <MudLink Href="mud-sample">MudBlazor Sample</MudLink>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6">
+        <MudCard>
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h5">🎨 Theme</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText>Use the light/dark mode toggle button in the top-right corner of the navbar to switch between light and dark themes.</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>

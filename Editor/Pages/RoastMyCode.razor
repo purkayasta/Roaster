@@ -1,0 +1,571 @@
+@page "/roast-my-code"
+@using BlazorMonaco.Editor
+@using Editor.Services
+@using Editor.Services.Dtos
+@inject IJSRuntime JS
+@inject IRoastApiService RoastApiService
+
+<PageTitle>Roast My Code</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    <!-- HEADER -->
+    <div style="margin-bottom: 24px;">
+        <MudText Typo="Typo.h3" GutterBottom="true">🔥 Roast My Code</MudText>
+        <MudText Typo="Typo.body1" Color="Color.Default">
+            Paste your code and click "Roast Me" to get sarcastic AI feedback inline.
+            The AI will generate witty, brutally honest comments right in the editor.
+        </MudText>
+    </div>
+
+    <MudGrid>
+        <!-- MAIN EDITOR AREA -->
+        <MudItem xs="12" md="9">
+            <!-- ROAST ME BUTTON -->
+            <div style="margin-bottom: 16px; display: flex; gap: 12px;">
+                <MudButton
+                    Variant="Variant.Filled"
+                    Color="Color.Error"
+                    Size="Size.Large"
+                    OnClick="HandleRoastMe"
+                    Disabled="@isLoading"
+                    StartIcon="@Icons.Material.Filled.LocalFireDepartment"
+                >
+                    @if (isLoading)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Roasting Your Code - @loadingProgress%</span>
+                    }
+                    else
+                    {
+                        <span>🔥 Roast Me</span>
+                    }
+                </MudButton>
+
+                @if (!string.IsNullOrEmpty(lastRoastTime))
+                {
+                    <MudText Typo="Typo.body2" Class="d-flex align-center">
+                        Last roasted: @lastRoastTime
+                    </MudText>
+                }
+            </div>
+
+            <!-- MONACO EDITOR -->
+            <MudPaper Elevation="2" Style="height: 600px; position: relative;">
+                <StandaloneCodeEditor
+                    @ref="editor"
+                    Id="roast-editor"
+                    ConstructionOptions="EditorConstructionOptions"
+                />
+            </MudPaper>
+        </MudItem>
+
+        <!-- SIDEBAR -->
+        <MudItem xs="12" md="3">
+            <MudPaper Elevation="1" Class="pa-4" Style="position: sticky; top: 20px;">
+                <MudText Typo="Typo.h6" GutterBottom="true">📊 Roast Statistics</MudText>
+
+                <MudGrid Spacing="2" Class="mb-4">
+                    <MudItem xs="6">
+                        <MudCard Elevation="0" Class="pa-3" Style="background: #f5f5f5; border-radius: 8px; text-align: center;">
+                            <MudText Typo="Typo.h5">@totalRoasts</MudText>
+                            <MudText Typo="Typo.caption">Comments</MudText>
+                        </MudCard>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudCard Elevation="0" Class="pa-3" Style="background: #f5f5f5; border-radius: 8px; text-align: center;">
+                            <MudText Typo="Typo.h5">@activeThreads.Count</MudText>
+                            <MudText Typo="Typo.caption">Active Threads</MudText>
+                        </MudCard>
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.h6" GutterBottom="true">🎯 Active Roasts</MudText>
+                @if (activeThreads.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Default">
+                        No roasts yet. Click the button above to start!
+                    </MudText>
+                }
+                else
+                {
+                    @foreach (var line in activeThreads)
+                    {
+                        <MudChip T="string"
+                            Text="@($"Line {line}")"
+                            OnClose="@(() => RemoveRoast(line))"
+                            Closeable="true"
+                            Class="mb-2"
+                            Color="Color.Error"
+                            Variant="Variant.Text"
+                        />
+                    }
+                }
+
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.h6" GutterBottom="true">⚙️ Settings</MudText>
+                <MudCheckBox
+                    @bind-Value="autoHighlight"
+                    Label="Auto-highlight syntax"
+                    Size="Size.Small"
+                    Color="Color.Primary"
+                />
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+<!--
+    HIDDEN CONTAINER FOR ROAST THREADS
+
+    This is crucial to understanding how the "hidden div strategy" works:
+
+    1. This container has display:none (invisible to user)
+    2. Blazor renders each RoastThread component here
+    3. Each component has a unique ID: roast-comment-{lineNumber}
+    4. When the API returns data, we call InjectRoastAsync() for each comment
+    5. InjectRoastAsync() uses JavaScript to move the div into the Monaco editor
+    6. The component's state and event handlers continue to work because
+       Blazor still tracks it in the render tree
+
+    Why this approach?
+    - Monaco manages the editor's DOM
+    - We can't render Blazor components directly inside Monaco
+    - But we can move DOM elements into Monaco that Blazor is tracking
+    - Blazor handles state, events, re-renders
+    - Monaco handles layout, positioning, view zones
+    - Perfect division of responsibilities!
+-->
+<div id="roast-comments-container" style="display: none;">
+    @foreach (var roast in roastComments)
+    {
+        <div id="roast-comment-@roast.LineNumber" style="display: none;">
+            <RoastThread
+                LineNumber="@roast.LineNumber"
+                CommentText="@roast.CommentText"
+                Severity="@roast.Severity"
+                OnReplySubmitted="@(CreateReplyHandler(roast.LineNumber))"
+                OnThreadClosed="@(CreateCloseHandler(roast.LineNumber))"
+            />
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// INJECTED SERVICES
+    /// These are provided by the Dependency Injection container (Program.cs)
+    /// </summary>
+
+    /// <summary>
+    /// The Roast API Service (injected from Program.cs)
+    /// This could be MockRoastApiService or HttpRoastApiService
+    /// The component doesn't know/care which implementation it is!
+    /// </summary>
+    // (Declared at the top with @inject IRoastApiService RoastApiService)
+
+    /// <summary>
+    /// COMPONENT STATE
+    /// </summary>
+
+    /// <summary>
+    /// Reference to the Monaco editor instance
+    /// Used to access editor properties and methods
+    /// </summary>
+    private StandaloneCodeEditor editor = null!;
+
+    /// <summary>
+    /// The roast comments returned from the API
+    /// This drives the rendering of hidden divs and view zones
+    /// </summary>
+    private List<RoastComment> roastComments = new();
+
+    /// <summary>
+    /// Tracks which lines have active roast threads
+    /// Used for statistics and management
+    /// </summary>
+    private List<int> activeThreads = new();
+
+    /// <summary>
+    /// Loading state flag
+    /// True while waiting for API response
+    /// Used to disable button and show spinner
+    /// </summary>
+    private bool isLoading = false;
+
+    /// <summary>
+    /// Loading progress (0-100)
+    /// Simulates progress while waiting for API
+    /// </summary>
+    private int loadingProgress = 0;
+
+    /// <summary>
+    /// Timestamp of last roast submission
+    /// Displayed in the sidebar
+    /// </summary>
+    private string lastRoastTime = string.Empty;
+
+    /// <summary>
+    /// Toggle for auto-syntax-highlighting
+    /// </summary>
+    private bool autoHighlight = true;
+
+    /// <summary>
+    /// Total count of roasts (statistics)
+    /// </summary>
+    private int totalRoasts = 0;
+
+    /// <summary>
+    /// Reference to the JavaScript interop module
+    /// Used to inject roasts into the Monaco editor
+    /// </summary>
+    private IJSObjectReference? monacoInteropModule;
+
+    /// <summary>
+    /// SAMPLE CODE
+    /// This is what users see when they first load the page
+    /// Good C# code with some potential for sarcastic comments
+    /// </summary>
+    private const string SampleCode = @"using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace RoastMyCode
+{
+    public class UserService
+    {
+        private List<string> _users = new();
+
+        public void AddUser(string email)
+        {
+            // TODO: Validate email? Nah, who needs that
+            _users.Add(email);
+        }
+
+        public string GetUserCount()
+        {
+            // Look, I know this could be _users.Count
+            // But let's make it complicated for fun
+            int count = 0;
+            foreach (var user in _users)
+            {
+                count++;
+            }
+            return count.ToString();
+        }
+
+        public void DeleteAllUsers()
+        {
+            // YOLO - no confirmation needed!
+            _users.Clear();
+        }
+    }
+}";
+
+    /// <summary>
+    /// Configures the Monaco editor appearance
+    /// Dark theme for that IDE feel
+    /// </summary>
+    private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
+    {
+        return new StandaloneEditorConstructionOptions
+        {
+            AutomaticLayout = true,
+            Language = "csharp",
+            Value = SampleCode,
+            Theme = "vs-dark",
+            WordWrap = "on",
+            ScrollBeyondLastLine = false,
+            Minimap = new EditorMinimapOptions { Enabled = true },
+            LineNumbers = "on",
+            GlyphMargin = true,
+            LineDecorationsWidth = 16,
+            RenderLineHighlight = "line",
+            FontSize = 13,
+            FontFamily = "'Fira Code', 'Courier New', monospace"
+        };
+    }
+
+    /// <summary>
+    /// LIFECYCLE METHODS
+    /// </summary>
+
+    /// <summary>
+    /// Called when component is initialized
+    /// Loads the JavaScript interop module for Monaco view zones
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            monacoInteropModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import", "./monaco-interop.js"
+            );
+            Console.WriteLine("[RoastMyCode] Monaco interop module loaded");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[RoastMyCode] Error loading monaco-interop.js: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// EVENT HANDLERS
+    /// </summary>
+
+    /// <summary>
+    /// Called when user clicks "Roast Me" button
+    ///
+    /// This is the main workflow:
+    /// 1. Get code from editor
+    /// 2. Show loading state
+    /// 3. Call IRoastApiService.SubmitCodeAsync
+    /// 4. Receive list of RoastComments
+    /// 5. Trigger re-render to show hidden divs
+    /// 6. Use JS Interop to inject divs into editor as view zones
+    /// 7. Display roasts inline in the editor
+    /// </summary>
+    private async Task HandleRoastMe()
+    {
+        try
+        {
+            // Get the code from the editor
+            string code = await editor.GetValue();
+
+            if (string.IsNullOrWhiteSpace(code))
+            {
+                // Could show a snackbar or error message here
+                return;
+            }
+
+            // Show loading state
+            isLoading = true;
+            loadingProgress = 0;
+            await InvokeAsync(StateHasChanged);
+
+            // Simulate progress while waiting
+            var progressTask = Task.Run(async () =>
+            {
+                for (int i = 0; i < 100; i += 10)
+                {
+                    await Task.Delay(200);
+                    loadingProgress = Math.Min(i, 90);
+                    await InvokeAsync(StateHasChanged);
+                }
+            });
+
+            // Create the submission request
+            var request = new SubmissionRequest
+            {
+                Code = code,
+                Language = "csharp"
+            };
+
+            // CALL THE INJECTED SERVICE
+            // This is where the magic happens!
+            // We're using IRoastApiService, which could be:
+            // - MockRoastApiService (simulates API with 2-second delay)
+            // - HttpRoastApiService (real backend HTTP call)
+            // The component doesn't know or care!
+            roastComments = await RoastApiService.SubmitCodeAsync(request);
+
+            // Complete the progress animation
+            loadingProgress = 100;
+            await InvokeAsync(StateHasChanged);
+
+            // Update statistics
+            activeThreads = roastComments.Select(r => r.LineNumber).ToList();
+            totalRoasts = roastComments.Count;
+            lastRoastTime = DateTime.Now.ToString("h:mm tt");
+
+            // TRIGGER RE-RENDER
+            // This causes Blazor to render all the RoastThread components
+            // in the hidden container
+            await InvokeAsync(StateHasChanged);
+
+            // Give Blazor time to render the components to the DOM
+            // before we try to move them
+            await Task.Delay(100);
+
+            // NOW INJECT EACH ROAST INTO THE EDITOR
+            // For each roast comment, move its hidden div into a Monaco view zone
+            foreach (var roast in roastComments)
+            {
+                await InjectRoastAsync(roast.LineNumber, $"roast-comment-{roast.LineNumber}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[RoastMyCode] Error during roast: {ex.Message}");
+            // Could show error snackbar here
+        }
+        finally
+        {
+            isLoading = false;
+            loadingProgress = 0;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    /// <summary>
+    /// Injects a single roast comment into the Monaco editor as a view zone
+    ///
+    /// This uses the "hidden div strategy":
+    /// 1. The RoastThread component was rendered in a hidden div
+    /// 2. We have the div ID and line number
+    /// 3. We call JS interop to move the div into the editor
+    /// 4. Monaco's changeViewZones API positions it at the specified line
+    /// 5. The div is now visible and interactive inside the editor
+    /// </summary>
+    private async Task InjectRoastAsync(int lineNumber, string elementId)
+    {
+        if (monacoInteropModule == null)
+        {
+            Console.WriteLine("[RoastMyCode] Monaco interop not loaded");
+            return;
+        }
+
+        try
+        {
+            Console.WriteLine($"[RoastMyCode] Injecting roast at line {lineNumber}");
+
+            // Call the JavaScript function to inject the zone
+            // This function (in monaco-interop.js):
+            // - Finds the DOM element by ID
+            // - Gets the Monaco editor instance
+            // - Creates a view zone at the specified line
+            // - Moves the element into the view zone
+            await monacoInteropModule.InvokeVoidAsync(
+                "injectViewZone",
+                "roast-editor",        // Editor ID
+                lineNumber,            // Where to insert
+                elementId              // What to insert
+            );
+
+            Console.WriteLine($"[RoastMyCode] Successfully injected roast at line {lineNumber}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[RoastMyCode] Error injecting roast: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Called when user replies to a roast thread
+    /// Demonstrates that state management and event handlers work
+    /// even after the component's DOM has been moved into Monaco
+    /// </summary>
+    private async Task HandleThreadReplyAsync(int lineNumber, string reply)
+    {
+        Console.WriteLine($"[RoastMyCode] User replied to line {lineNumber}: {reply}");
+
+        try
+        {
+            // Call the service to post the reply
+            // This uses IRoastApiService.ReplyToThreadAsync
+            // Again, could be mock or real - doesn't matter!
+            bool success = await RoastApiService.ReplyToThreadAsync(lineNumber, reply);
+
+            if (success)
+            {
+                Console.WriteLine("[RoastMyCode] Reply posted successfully");
+                // Could show success message here
+            }
+            else
+            {
+                Console.WriteLine("[RoastMyCode] Failed to post reply");
+                // Could show error message here
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[RoastMyCode] Error posting reply: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Called when user closes a roast thread
+    /// </summary>
+    private async Task HandleThreadClosedAsync(int lineNumber)
+    {
+        Console.WriteLine($"[RoastMyCode] Roast thread closed at line {lineNumber}");
+        RemoveRoast(lineNumber);
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Removes a roast from the UI
+    /// </summary>
+    private void RemoveRoast(int lineNumber)
+    {
+        roastComments.RemoveAll(r => r.LineNumber == lineNumber);
+        activeThreads.Remove(lineNumber);
+        totalRoasts = roastComments.Count;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Factory method to create reply event callback
+    /// </summary>
+    private EventCallback<string> CreateReplyHandler(int lineNumber)
+    {
+        return EventCallback.Factory.Create<string>(this, async (reply) =>
+        {
+            await HandleThreadReplyAsync(lineNumber, reply);
+        });
+    }
+
+    /// <summary>
+    /// Factory method to create close event callback
+    /// </summary>
+    private EventCallback CreateCloseHandler(int lineNumber)
+    {
+        return EventCallback.Factory.Create(this, async () =>
+        {
+            await HandleThreadClosedAsync(lineNumber);
+        });
+    }
+}
+
+<!--
+    ARCHITECTURAL NOTES
+    ===================
+
+    DEPENDENCY INJECTION IN ACTION:
+    This component uses dependency injection for IRoastApiService
+
+    Program.cs registered: builder.Services.AddScoped<IRoastApiService, MockRoastApiService>();
+
+    So when HandleRoastMe() calls RoastApiService.SubmitCodeAsync():
+    - Blazor resolves IRoastApiService
+    - Returns the registered MockRoastApiService instance
+    - Calls the mock's SubmitCodeAsync method
+    - The mock simulates 2 seconds of work
+    - Returns hardcoded roasts
+    - Component updates UI with results
+
+    To switch to real backend:
+    - Create HttpRoastApiService : IRoastApiService
+    - Change Program.cs to: builder.Services.AddScoped<IRoastApiService, HttpRoastApiService>();
+    - No changes to this component needed!
+
+    ASYNC/AWAIT PATTERN:
+    - HandleRoastMe is async (because it awaits the service call)
+    - We use await Task.Delay() to simulate progress
+    - We call StateHasChanged() after key points
+    - This ensures proper sequencing: load → render → inject
+
+    ERROR HANDLING:
+    - We wrap in try/catch
+    - Log errors to console
+    - Gracefully handle missing modules
+    - Set loading state back to false in finally block
+
+    PERFORMANCE:
+    - We only inject roasts after DOM is rendered (100ms delay)
+    - We show progress while waiting for API
+    - Statistics are updated after successful roast
+    - UI is responsive even during loading
+-->

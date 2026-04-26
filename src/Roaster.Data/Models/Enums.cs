@@ -14,3 +14,13 @@ public enum ReviewSeverity
     Medium = 20,
     Brutal = 30
 }
+
+public enum SubmissionEventType
+{
+    Submitted         = 10,
+    ProcessingStarted = 20,
+    ReviewCompleted   = 30,
+    Failed            = 40,
+    UserReplied       = 50,
+    AiReplied         = 60
+}

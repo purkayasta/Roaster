@@ -22,6 +22,11 @@ public class SubmissionConfiguration : IEntityTypeConfiguration<Submission>
                .HasForeignKey<Review>(r => r.SubmissionId)
                .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasMany(s => s.Events)
+               .WithOne(e => e.Submission)
+               .HasForeignKey(e => e.SubmissionId)
+               .OnDelete(DeleteBehavior.Cascade);
+
         builder.ToTable("Submissions");
     }
 }

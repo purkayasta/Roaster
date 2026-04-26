@@ -1,7 +1,9 @@
 using System.Text.RegularExpressions;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Roaster.Api.Models;
 using Roaster.Contracts.Dtos;
+using Roaster.Contracts.Events;
 using Roaster.Data.Context;
 using Roaster.Data.Models;
 
@@ -11,7 +13,8 @@ public static class SubmissionEndpoints
 {
     public static void MapSubmissionEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/api/submissions", async (SubmissionRequest req, RoasterDbContext db, CancellationToken ct) =>
+        app.MapPost("/api/submissions", async (SubmissionRequest req, RoasterDbContext db,
+            IPublishEndpoint publisher, CancellationToken ct) =>
         {
             var sanitized = Regex.Replace(req.Code, @"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "");
 
@@ -24,6 +27,11 @@ public static class SubmissionEndpoints
 
             db.Submissions.Add(submission);
             await db.SaveChangesAsync(ct);
+
+            await publisher.Publish(new CodeSubmittedEvent(
+                submission.Id,
+                Guid.NewGuid(),       // CorrelationId — Phase 3 will wire this properly
+                submission.CreatedAt), ct);
 
             var dto = ToDto(submission);
             return Results.AcceptedAtRoute("GetSubmission", new { id = submission.Id }, dto);

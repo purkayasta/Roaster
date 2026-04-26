@@ -1,4 +1,6 @@
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using RabbitMQ.Client;
 using Roaster.Api.Endpoints;
 using Roaster.Data.Context;
 using Scalar.AspNetCore;
@@ -18,8 +20,20 @@ builder.Services.AddCors(opts =>
          .AllowAnyHeader()
          .AllowAnyMethod()));
 
+builder.Services.AddMassTransit(x =>
+    x.UsingRabbitMq((ctx, cfg) =>
+    {
+        cfg.Host(builder.Configuration["RabbitMQ:Uri"]);
+        cfg.ConfigureEndpoints(ctx);
+    }));
+
 builder.Services.AddHealthChecks()
-    .AddNpgSql(builder.Configuration.GetConnectionString("Postgres")!);
+    .AddNpgSql(builder.Configuration.GetConnectionString("Postgres")!)
+    .AddRabbitMQ(sp =>
+    {
+        var factory = new ConnectionFactory { Uri = new Uri(builder.Configuration["RabbitMQ:Uri"]!) };
+        return factory.CreateConnectionAsync();
+    });
 
 builder.Services.AddOpenApi();
 

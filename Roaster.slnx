@@ -3,6 +3,9 @@
     <Project Path="src/Roaster.Data/Roaster.Data.csproj" />
     <Project Path="src/Roaster.Contracts/Roaster.Contracts.csproj" />
     <Project Path="src/Roaster.Api/Roaster.Api.csproj" />
+    <Project Path="src/Roaster.Consumer/Roaster.Consumer.csproj" />
   </Folder>
-  <Project Path="src/Roaster.Editor/Roaster.Editor.csproj" />
+  <Folder Name="/Frontend/">
+    <Project Path="src/Roaster.Editor/Roaster.Editor.csproj" />
+  </Folder>
 </Solution>

@@ -2,6 +2,7 @@ using MassTransit;
 using Roaster.Contracts.Events;
 using Roaster.Data.Context;
 using Roaster.Data.Models;
+using SerilogContext = Serilog.Context.LogContext;
 
 namespace Roaster.Consumer.Consumers;
 
@@ -12,22 +13,26 @@ public class UserThreadReplyConsumer(RoasterDbContext db,
     {
         var msg = context.Message;
 
-        var thread = await db.CommentThreads.FindAsync(msg.ThreadId);
-        if (thread is null)
+        using (SerilogContext.PushProperty("CorrelationId", msg.CorrelationId))
+        using (SerilogContext.PushProperty("SubmissionId", msg.SubmissionId))
         {
-            logger.LogWarning("Thread {Id} not found", msg.ThreadId);
-            return;
+            var thread = await db.CommentThreads.FindAsync(msg.ThreadId);
+            if (thread is null)
+            {
+                logger.LogWarning("Thread {Id} not found", msg.ThreadId);
+                return;
+            }
+
+            // TODO Phase 4: call AI reviewer and save ThreadReply
+
+            db.SubmissionEvents.Add(new SubmissionEvent
+            {
+                SubmissionId  = msg.SubmissionId,
+                EventType     = SubmissionEventType.AiReplied,
+                CorrelationId = msg.CorrelationId,
+                OccurredAt    = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
         }
-
-        // TODO Phase 4: call AI reviewer and save ThreadReply
-
-        db.SubmissionEvents.Add(new SubmissionEvent
-        {
-            SubmissionId  = msg.SubmissionId,
-            EventType     = SubmissionEventType.AiReplied,
-            CorrelationId = msg.CorrelationId,
-            OccurredAt    = DateTime.UtcNow
-        });
-        await db.SaveChangesAsync();
     }
 }

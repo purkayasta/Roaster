@@ -23,17 +23,18 @@ public static class ReviewEndpoints
                 return Results.NoContent();
 
             var review = submission.Review;
-            var threadsByLine = review.Threads.ToDictionary(t => t.LineNumber, t => t.Id);
 
-            var comments = review.Comments.Select(c => new ReviewCommentDto(
-                c.LineNumber,
-                c.Comment,
-                c.Severity.ToString(),
-                threadsByLine.TryGetValue(c.LineNumber, out var tid) ? tid : null
-            )).ToList();
-
-            var dto = new ReviewDto(review.Id, review.SubmissionId, review.Summary, review.CreatedAt, comments);
-            return Results.Ok(dto);
+            return Results.Ok(new ReviewDto(
+                review.Id,
+                review.SubmissionId,
+                review.Summary,
+                review.CreatedAt,
+                review.Comments.Select(c => new ReviewCommentDto(
+                    c.LineNumber,
+                    c.Comment,
+                    c.Severity.ToString(),
+                    review.Threads.FirstOrDefault(t => t.LineNumber == c.LineNumber)?.Id
+                )).ToList()));
         }).WithName("GetReview");
     }
 }

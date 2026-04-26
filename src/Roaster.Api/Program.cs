@@ -2,6 +2,7 @@ using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using RabbitMQ.Client;
 using Roaster.Api.Endpoints;
+using Roaster.Api.Middleware;
 using Roaster.Data.Context;
 using Scalar.AspNetCore;
 using Serilog;
@@ -39,6 +40,7 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 app.UseCors();
+app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseSerilogRequestLogging();
 
 if (app.Environment.IsDevelopment())

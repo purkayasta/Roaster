@@ -14,8 +14,11 @@ public static class ThreadEndpoints
     {
         app.MapPost("/api/submissions/{submissionId:long}/reviews/{reviewId:long}/lines/{lineNumber:int}/threads",
             async (long submissionId, long reviewId, int lineNumber, ReplyRequest req, RoasterDbContext db,
-                IPublishEndpoint publisher, CancellationToken ct) =>
+                IPublishEndpoint publisher, HttpContext ctx, CancellationToken ct) =>
             {
+                var correlationId = (Guid)ctx.Items["CorrelationId"]!;
+                await using var tx = await db.Database.BeginTransactionAsync(ct);
+
                 var review = await db.Reviews
                     .Include(r => r.Threads)
                     .FirstOrDefaultAsync(r => r.Id == reviewId && r.SubmissionId == submissionId, ct);
@@ -44,31 +47,32 @@ public static class ThreadEndpoints
                 };
 
                 db.ThreadReplies.Add(reply);
+                db.SubmissionEvents.Add(new SubmissionEvent
+                {
+                    SubmissionId  = submissionId,
+                    EventType     = SubmissionEventType.UserReplied,
+                    CorrelationId = correlationId,
+                    OccurredAt    = DateTime.UtcNow
+                });
                 await db.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
 
                 await publisher.Publish(new UserThreadReplyEvent(
-                    thread.Id,
-                    submissionId,
-                    lineNumber,
-                    Guid.NewGuid(),       // CorrelationId — Phase 3 will wire this properly
-                    DateTime.UtcNow), ct);
+                    thread.Id, submissionId, lineNumber, correlationId, DateTime.UtcNow), ct);
 
                 return Results.Accepted(null, new { threadId = thread.Id, replyId = reply.Id });
             }).WithName("CreateThread");
 
         app.MapGet("/api/threads/{threadId:long}/replies", async (long threadId, RoasterDbContext db, CancellationToken ct) =>
         {
-            var thread = await db.CommentThreads.FindAsync([threadId], ct);
-            if (thread is null)
+            if (!await db.CommentThreads.AnyAsync(t => t.Id == threadId, ct))
                 return Results.NotFound();
 
-            var replies = await db.ThreadReplies
+            return Results.Ok(await db.ThreadReplies
                 .Where(r => r.ThreadId == threadId)
                 .OrderBy(r => r.CreatedAt)
                 .Select(r => new ThreadReplyDto(r.Id, r.Content, r.IsAiReply, r.CreatedAt))
-                .ToListAsync(ct);
-
-            return Results.Ok(replies);
+                .ToListAsync(ct));
         }).WithName("GetReplies");
     }
 }

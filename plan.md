@@ -25,7 +25,7 @@ For all implementation details, see [Documentations/Summary.md](Documentations/S
 | 0 | Setup & Rename | ✅ Done | [Phase-0-Setup.md](Documentations/Plans/Phase-0-Setup.md) |
 | 1 | API | ✅ Done | [Phase-1-API.md](Documentations/Plans/Phase-1-API.md) |
 | 2 | Events | ✅ Done | [Phase-2-Events.md](Documentations/Plans/Phase-2-Events.md) |
-| 3 | Correlation IDs | ⬜ Not started | [Phase-3-CorrelationIDs.md](Documentations/Plans/Phase-3-CorrelationIDs.md) |
+| 3 | Correlation IDs | ✅ Done | [Phase-3-CorrelationIDs.md](Documentations/Plans/Phase-3-CorrelationIDs.md) |
 | 4 | AI Reviewer | ⬜ Not started | [Phase-4-AIReviewer.md](Documentations/Plans/Phase-4-AIReviewer.md) |
 | 5 | Unit Tests | ⬜ Not started | [Phase-5-UnitTests.md](Documentations/Plans/Phase-5-UnitTests.md) |
 | 6 | DbUp Migrations | ⬜ Not started | [Phase-6-Migration.md](Documentations/Plans/Phase-6-Migration.md) |

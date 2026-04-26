@@ -1,0 +1,12 @@
+namespace Roaster.Data.Models;
+
+public class ThreadReply
+{
+    public long Id { get; init; }
+    public long ThreadId { get; init; }
+    public string? Content { get; init; }
+    public bool IsAiReply { get; init; }
+    public DateTime CreatedAt { get; init; }
+
+    public CommentThread Thread { get; set; } = null!;
+}

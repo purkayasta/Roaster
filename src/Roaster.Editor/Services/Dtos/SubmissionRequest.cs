@@ -1,4 +1,4 @@
-namespace Editor.Services.Dtos;
+namespace Roaster.Editor.Services.Dtos;
 
 /// <summary>
 /// SubmissionRequest DTO

@@ -1,6 +1,6 @@
-using Editor.Services.Dtos;
+using Roaster.Editor.Services.Dtos;
 
-namespace Editor.Services;
+namespace Roaster.Editor.Services;
 
 /// <summary>
 /// MockRoastApiService Implementation

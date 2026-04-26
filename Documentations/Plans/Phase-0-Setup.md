@@ -39,7 +39,7 @@ As backend projects are added (Phase 1 onward), each goes under a `Backend` solu
     <Project Path="src/Roaster.Reviewer/Roaster.Reviewer.csproj" />
     <Project Path="src/Roaster.Migration/Roaster.Migration.csproj" />
   </Folder>
-  <Project Path="Editor/Editor.csproj" />
+  <Project Path="src/Editor/Editor.csproj" />
 </Solution>
 ```
 
@@ -49,8 +49,8 @@ As backend projects are added (Phase 1 onward), each goes under a `Backend` solu
 
 ```
 Roaster.slnx
-Editor/                    # Blazor WASM frontend (existing)
 src/
+  Editor/                  # Blazor WASM frontend (moved Phase 1.0)
   Roaster.Data/            # Added Phase 1
   Roaster.Contracts/       # Added Phase 1
   Roaster.Api/             # Added Phase 1

@@ -1,3 +1,8 @@
 <Solution>
-  <Project Path="Editor/Editor.csproj" />
+  <Folder Name="/Backend/">
+    <Project Path="src/Roaster.Data/Roaster.Data.csproj" />
+    <Project Path="src/Roaster.Contracts/Roaster.Contracts.csproj" />
+    <Project Path="src/Roaster.Api/Roaster.Api.csproj" />
+  </Folder>
+  <Project Path="src/Roaster.Editor/Roaster.Editor.csproj" />
 </Solution>

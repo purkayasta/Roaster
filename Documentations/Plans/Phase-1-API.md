@@ -4,6 +4,29 @@ Build the core data layer and API. No events, no AI, no messaging — just the s
 
 ---
 
+## 1.0 — Move Editor into src/
+
+Move the existing Blazor WASM frontend under `src/` so all projects share one root.
+
+**Steps:**
+1. Move `Editor/` → `src/Editor/`
+2. Update `Roaster.slnx` to reflect the new path
+
+**Roaster.slnx after this step:**
+```xml
+<Solution>
+  <Project Path="src/Editor/Editor.csproj" />
+</Solution>
+```
+
+**Verify:** `dotnet build Roaster.slnx` succeeds from the repo root.
+
+**Pre-checklist:**
+- [ ] `Editor/` physically moved to `src/Editor/`
+- [ ] `Roaster.slnx` updated with new path
+
+---
+
 ## 1.A — Models
 
 **Project:** `Roaster.Data`

@@ -1,12 +1,16 @@
 using MassTransit;
+using Microsoft.EntityFrameworkCore;
 using Roaster.Contracts.Events;
 using Roaster.Data.Context;
 using Roaster.Data.Models;
+using Roaster.Reviewer.Abstractions;
 using SerilogContext = Serilog.Context.LogContext;
 
 namespace Roaster.Consumer.Consumers;
 
-public class UserThreadReplyConsumer(RoasterDbContext db,
+public class UserThreadReplyConsumer(
+    RoasterDbContext db,
+    IAiReviewService ai,
     ILogger<UserThreadReplyConsumer> logger) : IConsumer<UserThreadReplyEvent>
 {
     public async Task Consume(ConsumeContext<UserThreadReplyEvent> context)
@@ -16,14 +20,43 @@ public class UserThreadReplyConsumer(RoasterDbContext db,
         using (SerilogContext.PushProperty("CorrelationId", msg.CorrelationId))
         using (SerilogContext.PushProperty("SubmissionId", msg.SubmissionId))
         {
-            var thread = await db.CommentThreads.FindAsync(msg.ThreadId);
+            var ct = context.CancellationToken;
+
+            var thread = await db.CommentThreads
+                .Include(t => t.Replies.OrderBy(r => r.CreatedAt))
+                .Include(t => t.Review)
+                    .ThenInclude(r => r.Submission)
+                .FirstOrDefaultAsync(t => t.Id == msg.ThreadId, ct);
+
             if (thread is null)
             {
                 logger.LogWarning("Thread {Id} not found", msg.ThreadId);
                 return;
             }
 
-            // TODO Phase 4: call AI reviewer and save ThreadReply
+            var code            = thread.Review.Submission.Payload.Content;
+            var originalComment = thread.Review.Comments
+                .FirstOrDefault(c => c.LineNumber == thread.LineNumber)?.Comment ?? string.Empty;
+
+            var history = thread.Replies
+                .Select(r => new AiChatMessage(r.IsAiReply ? "assistant" : "user", r.Content ?? string.Empty))
+                .ToList();
+
+            // The latest user reply is the last entry in Replies (saved by API before publishing event)
+            var userReply = history.LastOrDefault(m => m.Role == "user")?.Content ?? string.Empty;
+
+            // Build history without the latest user message (it's passed separately)
+            var priorHistory = history.Count > 0 ? history[..^1] : history;
+
+            var aiReply = await ai.ReplyToThreadAsync(code, originalComment, priorHistory, userReply, ct);
+
+            db.ThreadReplies.Add(new ThreadReply
+            {
+                ThreadId  = thread.Id,
+                Content   = aiReply,
+                IsAiReply = true,
+                CreatedAt = DateTime.UtcNow
+            });
 
             db.SubmissionEvents.Add(new SubmissionEvent
             {
@@ -32,7 +65,8 @@ public class UserThreadReplyConsumer(RoasterDbContext db,
                 CorrelationId = msg.CorrelationId,
                 OccurredAt    = DateTime.UtcNow
             });
-            await db.SaveChangesAsync();
+
+            await db.SaveChangesAsync(ct);
         }
     }
 }

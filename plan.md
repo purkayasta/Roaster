@@ -8,12 +8,12 @@ For all implementation details, see [Documentations/Summary.md](Documentations/S
 
 - [x] `Roaster.slnx` at solution root
 - [x] `Roaster.Editor` added to `Roaster.slnx` under `Frontend` solution folder
-- [ ] All backend projects added to `Roaster.slnx` under `Backend` solution folder:
+- [x] All backend projects added to `Roaster.slnx` under `Backend` solution folder (pending `Roaster.Migration` in Phase 6):
   - [x] `Roaster.Data`
   - [x] `Roaster.Contracts`
   - [x] `Roaster.Api`
   - [x] `Roaster.Consumer`
-  - [ ] `Roaster.Reviewer`
+  - [x] `Roaster.Reviewer`
   - [ ] `Roaster.Migration`
 
 ---
@@ -26,8 +26,8 @@ For all implementation details, see [Documentations/Summary.md](Documentations/S
 | 1 | API | ✅ Done | [Phase-1-API.md](Documentations/Plans/Phase-1-API.md) |
 | 2 | Events | ✅ Done | [Phase-2-Events.md](Documentations/Plans/Phase-2-Events.md) |
 | 3 | Correlation IDs | ✅ Done | [Phase-3-CorrelationIDs.md](Documentations/Plans/Phase-3-CorrelationIDs.md) |
-| 4 | AI Reviewer | ⬜ Not started | [Phase-4-AIReviewer.md](Documentations/Plans/Phase-4-AIReviewer.md) |
-| 5 | Unit Tests | ⬜ Not started | [Phase-5-UnitTests.md](Documentations/Plans/Phase-5-UnitTests.md) |
+| 4 | AI Reviewer | ✅ Done | [Phase-4-AIReviewer.md](Documentations/Plans/Phase-4-AIReviewer.md) |
+| 5 | Unit Tests | ✅ Done | [Phase-5-UnitTests.md](Documentations/Plans/Phase-5-UnitTests.md) |
 | 6 | DbUp Migrations | ⬜ Not started | [Phase-6-Migration.md](Documentations/Plans/Phase-6-Migration.md) |
 | 7 | Docker | ⬜ Not started | [Phase-7-Docker.md](Documentations/Plans/Phase-7-Docker.md) |
 | 8 | Frontend | ⬜ Not started | [Phase-8-Frontend.md](Documentations/Plans/Phase-8-Frontend.md) |

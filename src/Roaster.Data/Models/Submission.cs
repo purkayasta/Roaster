@@ -9,5 +9,6 @@ public class Submission
     public DateTime UpdatedAt { get; set; }
 
     public Review? Review { get; set; }
+    public ReviewMetrics? Metrics { get; set; }
     public ICollection<SubmissionEvent> Events { get; set; } = [];
 }

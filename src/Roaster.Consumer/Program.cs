@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Roaster.Consumer.Consumers;
 using Roaster.Data.Context;
+using Roaster.Reviewer;
+using Roaster.Reviewer.Options;
 using Serilog;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -12,6 +14,9 @@ builder.Services.AddSerilog((ctx, cfg) =>
 
 builder.Services.AddDbContext<RoasterDbContext>(opts =>
     opts.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")));
+
+builder.Services.Configure<OllamaOptions>(builder.Configuration.GetSection("Ollama"));
+builder.Services.AddAiReviewer();
 
 builder.Services.AddMassTransit(x =>
 {

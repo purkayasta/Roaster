@@ -12,6 +12,7 @@ public class RoasterDbContext : DbContext
     public DbSet<CommentThread> CommentThreads => Set<CommentThread>();
     public DbSet<ThreadReply> ThreadReplies => Set<ThreadReply>();
     public DbSet<SubmissionEvent> SubmissionEvents => Set<SubmissionEvent>();
+    public DbSet<ReviewMetrics> ReviewMetrics => Set<ReviewMetrics>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
         => modelBuilder.ApplyConfigurationsFromAssembly(typeof(RoasterDbContext).Assembly);

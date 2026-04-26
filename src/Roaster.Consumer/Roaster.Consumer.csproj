@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Roaster.Data\Roaster.Data.csproj" />
     <ProjectReference Include="..\Roaster.Contracts\Roaster.Contracts.csproj" />
+    <ProjectReference Include="..\Roaster.Reviewer\Roaster.Reviewer.csproj" />
   </ItemGroup>
 
 </Project>

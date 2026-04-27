@@ -27,6 +27,8 @@ public class CodeSubmittedConsumer(
         {
             var ct = context.CancellationToken;
 
+            logger.LogInformation("Processing CodeSubmittedEvent for submission {Id}", msg.SubmissionId);
+
             var submission = await db.Submissions.FindAsync(msg.SubmissionId, ct);
             if (submission is null)
             {
@@ -45,13 +47,20 @@ public class CodeSubmittedConsumer(
             });
             submission.Status = SubmissionStatus.Processing;
             await db.SaveChangesAsync(ct);
+            logger.LogInformation("Submission {Id} status → Processing", msg.SubmissionId);
 
             var stopwatch = Stopwatch.StartNew();
 
             try
             {
+                logger.LogInformation("Calling AI review for submission {Id}, language {Language}, code length {Length} chars",
+                    msg.SubmissionId, submission.Payload.Language, submission.Payload.Content.Length);
+
                 var aiResult = await ai.ReviewCodeAsync(
                     submission.Payload.Content, submission.Payload.Language, ct);
+
+                logger.LogInformation("AI review completed for submission {Id} in {ElapsedMs}ms, {CommentCount} comments",
+                    msg.SubmissionId, stopwatch.ElapsedMilliseconds, aiResult.LineComments.Count);
 
                 var review = new Review
                 {
@@ -93,9 +102,13 @@ public class CodeSubmittedConsumer(
                 });
 
                 await db.SaveChangesAsync(ct);
+                logger.LogInformation("Review {ReviewId} saved for submission {Id}, status → Completed, total {TotalMs}ms",
+                    review.Id, msg.SubmissionId, (int)(DateTime.UtcNow - msg.SubmittedAt).TotalMilliseconds);
 
                 await publisher.Publish(new ReviewCompletedEvent(
                     submission.Id, review.Id, msg.CorrelationId, DateTime.UtcNow), ct);
+
+                logger.LogInformation("ReviewCompletedEvent published for submission {Id}", msg.SubmissionId);
             }
             catch (Exception ex)
             {

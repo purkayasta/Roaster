@@ -29,8 +29,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var darkMode = await JS.InvokeAsync<bool>("localStorage.getItem", "mudblazor-darkmode");
-        isDarkMode = darkMode;
+        var stored = await JS.InvokeAsync<string?>("localStorage.getItem", "mudblazor-darkmode");
+        isDarkMode = stored == "true";
     }
 
     private async Task ToggleDarkMode()

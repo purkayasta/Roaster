@@ -29,11 +29,13 @@ builder.Services.AddMassTransit(x =>
 
         cfg.ReceiveEndpoint("code-submitted", e =>
         {
+            e.ConcurrentMessageLimit = 1;
+            e.PrefetchCount = 1;
             e.ConfigureConsumer<CodeSubmittedConsumer>(ctx);
-            e.UseMessageRetry(r => r.Exponential(5,
-                TimeSpan.FromSeconds(2),
-                TimeSpan.FromSeconds(60),
-                TimeSpan.FromSeconds(5)));
+            e.UseMessageRetry(r => r.Exponential(3,
+                TimeSpan.FromSeconds(10),
+                TimeSpan.FromSeconds(120),
+                TimeSpan.FromSeconds(10)));
         });
 
         cfg.ReceiveEndpoint("user-thread-reply", e =>

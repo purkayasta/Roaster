@@ -14,7 +14,7 @@ For all implementation details, see [Documentations/Summary.md](Documentations/S
   - [x] `Roaster.Api`
   - [x] `Roaster.Consumer`
   - [x] `Roaster.Reviewer`
-  - [ ] `Roaster.Migration`
+  - [x] `Roaster.Migration`
 
 ---
 
@@ -29,6 +29,6 @@ For all implementation details, see [Documentations/Summary.md](Documentations/S
 | 4 | AI Reviewer | ✅ Done | [Phase-4-AIReviewer.md](Documentations/Plans/Phase-4-AIReviewer.md) |
 | 5 | Unit Tests | ✅ Done | [Phase-5-UnitTests.md](Documentations/Plans/Phase-5-UnitTests.md) |
 | 6 | DbUp Migrations | ⬜ Not started | [Phase-6-Migration.md](Documentations/Plans/Phase-6-Migration.md) |
-| 7 | Docker | ⬜ Not started | [Phase-7-Docker.md](Documentations/Plans/Phase-7-Docker.md) |
-| 8 | Frontend | ⬜ Not started | [Phase-8-Frontend.md](Documentations/Plans/Phase-8-Frontend.md) |
+| 7 | Docker | ✅ Done | [Phase-7-Docker.md](Documentations/Plans/Phase-7-Docker.md) |
+| 8 | Frontend | ✅ Done | [Phase-8-Frontend.md](Documentations/Plans/Phase-8-Frontend.md) |
 | 9 | Continue | ⬜ Not started | [Phase-9-Continue.md](Documentations/Plans/Phase-9-Continue.md) |

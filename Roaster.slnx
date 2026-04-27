@@ -5,6 +5,7 @@
     <Project Path="src/Roaster.Api/Roaster.Api.csproj" />
     <Project Path="src/Roaster.Consumer/Roaster.Consumer.csproj" />
     <Project Path="src/Roaster.Reviewer/Roaster.Reviewer.csproj" />
+    <Project Path="src/Roaster.Migration/Roaster.Migration.csproj" />
   </Folder>
   <Folder Name="/Frontend/">
     <Project Path="src/Roaster.Editor/Roaster.Editor.csproj" />

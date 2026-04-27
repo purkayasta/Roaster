@@ -6,7 +6,7 @@ Create the `Roaster.Migration` console app that owns all schema creation. Runs o
 
 ## Pre-checklist
 
-- [ ] Add `Roaster.Migration` to `Roaster.slnx` under solution folder `Backend`
+- [x] Add `Roaster.Migration` to `Roaster.slnx` under solution folder `Backend`
 
 ---
 

@@ -150,6 +150,12 @@
     [Parameter]
     public int LineNumber { get; set; }
 
+    [Parameter]
+    public long SubmissionId { get; set; }
+
+    [Parameter]
+    public long ReviewId { get; set; }
+
     /// <summary>
     /// The AI-generated roast comment text
     /// Can include markdown, emoji, sarcasm, etc.
@@ -264,7 +270,7 @@
             // CALL THE INJECTED SERVICE
             // This demonstrates that dependency injection works in child components too!
             // RoastApiService is either Mock or Http - component doesn't care
-            bool success = await RoastApiService.ReplyToThreadAsync(LineNumber, userReply);
+            bool success = await RoastApiService.ReplyToThreadAsync(SubmissionId, ReviewId, LineNumber, userReply);
 
             if (success)
             {

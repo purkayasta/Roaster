@@ -9,6 +9,10 @@
     <AssemblyName>Roaster.Editor</AssemblyName>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <WasmFingerprintAssets>false</WasmFingerprintAssets>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="BlazorMonaco" Version="3.4.0" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.7" />

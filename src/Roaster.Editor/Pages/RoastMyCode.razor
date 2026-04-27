@@ -50,7 +50,7 @@
             </div>
 
             <!-- MONACO EDITOR -->
-            <MudPaper Elevation="2" Style="height: 600px; position: relative;">
+            <MudPaper Elevation="2">
                 <StandaloneCodeEditor
                     @ref="editor"
                     Id="roast-editor"
@@ -95,7 +95,6 @@
                         <MudChip T="string"
                             Text="@($"Line {line}")"
                             OnClose="@(() => RemoveRoast(line))"
-                            Closeable="true"
                             Class="mb-2"
                             Color="Color.Error"
                             Variant="Variant.Text"
@@ -144,6 +143,8 @@
         <div id="roast-comment-@roast.LineNumber" style="display: none;">
             <RoastThread
                 LineNumber="@roast.LineNumber"
+                SubmissionId="@roast.SubmissionId"
+                ReviewId="@roast.ReviewId"
                 CommentText="@roast.CommentText"
                 Severity="@roast.Severity"
                 OnReplySubmitted="@(CreateReplyHandler(roast.LineNumber))"
@@ -466,7 +467,9 @@ namespace RoastMyCode
             // Call the service to post the reply
             // This uses IRoastApiService.ReplyToThreadAsync
             // Again, could be mock or real - doesn't matter!
-            bool success = await RoastApiService.ReplyToThreadAsync(lineNumber, reply);
+            var comment = roastComments.FirstOrDefault(r => r.LineNumber == lineNumber);
+            if (comment is null) return;
+            bool success = await RoastApiService.ReplyToThreadAsync(comment.SubmissionId, comment.ReviewId, lineNumber, reply);
 
             if (success)
             {

@@ -32,7 +32,8 @@ builder.Services.AddHealthChecks()
     .AddNpgSql(builder.Configuration.GetConnectionString("Postgres")!)
     .AddRabbitMQ(sp =>
     {
-        var factory = new ConnectionFactory { Uri = new Uri(builder.Configuration["RabbitMQ:Uri"]!) };
+        var amqpUri = builder.Configuration["RabbitMQ:Uri"]!.Replace("rabbitmq://", "amqp://");
+        var factory = new ConnectionFactory { Uri = new Uri(amqpUri) };
         return factory.CreateConnectionAsync();
     });
 
@@ -44,8 +45,7 @@ app.UseCors();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseSerilogRequestLogging();
 
-if (app.Environment.IsDevelopment())
-    app.MapScalarApiReference();
+app.MapScalarApiReference();
 
 app.MapOpenApi();
 app.MapSubmissionEndpoints();

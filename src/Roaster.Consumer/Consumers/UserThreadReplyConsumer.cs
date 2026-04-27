@@ -22,6 +22,8 @@ public class UserThreadReplyConsumer(
         {
             var ct = context.CancellationToken;
 
+            logger.LogInformation("Processing UserThreadReplyEvent for thread {ThreadId}, submission {SubmissionId}", msg.ThreadId, msg.SubmissionId);
+
             var thread = await db.CommentThreads
                 .Include(t => t.Replies.OrderBy(r => r.CreatedAt))
                 .Include(t => t.Review)
@@ -48,7 +50,12 @@ public class UserThreadReplyConsumer(
             // Build history without the latest user message (it's passed separately)
             var priorHistory = history.Count > 0 ? history[..^1] : history;
 
+            logger.LogInformation("Calling AI for thread {ThreadId}, line {LineNumber}, {HistoryCount} prior messages",
+                msg.ThreadId, msg.LineNumber, priorHistory.Count);
+
             var aiReply = await ai.ReplyToThreadAsync(code, originalComment, priorHistory, userReply, ct);
+
+            logger.LogInformation("AI reply received for thread {ThreadId}, length {Length} chars", msg.ThreadId, aiReply.Length);
 
             db.ThreadReplies.Add(new ThreadReply
             {
@@ -67,6 +74,7 @@ public class UserThreadReplyConsumer(
             });
 
             await db.SaveChangesAsync(ct);
+            logger.LogInformation("AI reply saved for thread {ThreadId}", msg.ThreadId);
         }
     }
 }

@@ -3,20 +3,26 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using MudBlazor.Services;
 using Roaster.Editor;
 using Roaster.Editor.Services;
+using Roaster.Editor.Services.Http;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
-builder.Services.AddMudServices();
+var apiOptions = builder.Configuration.GetSection("Api").Get<ApiOptions>()
+    ?? throw new InvalidOperationException("Api configuration section is missing.");
 
-// DEPENDENCY INJECTION: Register the Roast API Service
-// This is where the magic happens! We're telling Blazor to use MockRoastApiService
-// whenever a component requests IRoastApiService.
-//
-// To switch to a real backend service later, just change MockRoastApiService to HttpRoastApiService!
-// Components don't need to change at all.
-builder.Services.AddScoped<IRoastApiService, MockRoastApiService>();
+if (string.IsNullOrWhiteSpace(apiOptions.BaseUrl))
+    throw new InvalidOperationException("Api:BaseUrl is required.");
+
+builder.Services.AddHttpClient("RoasterApi", client =>
+    client.BaseAddress = new Uri(apiOptions.BaseUrl));
+
+builder.Services.AddScoped<SubmissionService>();
+builder.Services.AddScoped<ReviewService>();
+builder.Services.AddScoped<ThreadService>();
+builder.Services.AddScoped<IRoastApiService, HttpRoasterService>();
+
+builder.Services.AddMudServices();
 
 await builder.Build().RunAsync();

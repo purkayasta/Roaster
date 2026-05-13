@@ -1,0 +1,41 @@
+@inject NavigationManager Navigation
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">New Code Session</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_name"
+                      Label="Name"
+                      Placeholder="Enter session name"
+                      Required="true"
+                      RequiredError="Name is required"
+                      Immediate="true"
+                      AutoFocus="true" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Disabled="@string.IsNullOrWhiteSpace(_name)"
+                   OnClick="StartNow">
+            Start Now
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private string _name = string.Empty;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void StartNow()
+    {
+        if (string.IsNullOrWhiteSpace(_name)) return;
+        var id = Guid.NewGuid().ToString();
+        MudDialog.Close();
+        Navigation.NavigateTo($"/session/{id}/{Uri.EscapeDataString(_name)}");
+    }
+}

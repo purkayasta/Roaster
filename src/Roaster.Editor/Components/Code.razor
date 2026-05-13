@@ -1,0 +1,22 @@
+<div style="height: 100vh;">
+    <StandaloneCodeEditor @ref="_editor"
+                          Id="code-editor-main"
+                          ConstructionOptions="EditorOptions" />
+</div>
+
+@code {
+    private StandaloneCodeEditor _editor = null!;
+
+    private StandaloneEditorConstructionOptions EditorOptions(StandaloneCodeEditor _) => new()
+    {
+        AutomaticLayout      = true,
+        Language             = "csharp",
+        Value                = "// Paste your code here\n",
+        Theme                = "vs-dark",
+        WordWrap             = "on",
+        ScrollBeyondLastLine = false,
+        Minimap              = new EditorMinimapOptions { Enabled = false },
+        LineNumbers          = "on",
+        FontSize             = 14,
+    };
+}

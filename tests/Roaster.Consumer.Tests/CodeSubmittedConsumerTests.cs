@@ -39,8 +39,13 @@ public class CodeSubmittedConsumerTests : IDisposable
 
     private async Task<Submission> SeedSubmission()
     {
+        var session = new Session { Name = "test", CreatedAt = DateTime.UtcNow };
+        _db.Sessions.Add(session);
+        await _db.SaveChangesAsync();
+
         var sub = new Submission
         {
+            SessionId = session.Id,
             Payload   = new CodePayload { Content = "var x = 1;", Language = "csharp" },
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -113,6 +118,26 @@ public class CodeSubmittedConsumerTests : IDisposable
         await _consumer.Consume(ctx);
 
         _publisher.Verify(p => p.Publish(It.IsAny<ReviewCompletedEvent>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(SubmissionStatus.Processing)]
+    [InlineData(SubmissionStatus.Completed)]
+    [InlineData(SubmissionStatus.Failed)]
+    public async Task StaleEvent_StatusNotSubmitted_DiscardedWithoutAiCallOrPublish(SubmissionStatus staleStatus)
+    {
+        var sub = await SeedSubmission();
+        sub.Status = staleStatus;
+        await _db.SaveChangesAsync();
+
+        var ctx = FakeConsumeContext.For(new CodeSubmittedEvent(sub.Id, Guid.NewGuid(), DateTime.UtcNow));
+        await _consumer.Consume(ctx);
+
+        _ai.Verify(a => a.ReviewCodeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _publisher.Verify(p => p.Publish(It.IsAny<ReviewCompletedEvent>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        var updated = await _db.Submissions.FindAsync(sub.Id);
+        updated!.Status.Should().Be(staleStatus);
     }
 
     [Fact]

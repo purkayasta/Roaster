@@ -5,7 +5,8 @@ namespace Roaster.Editor.Shared;
 
 public abstract class EditorComponentBase : ComponentBase
 {
-    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    [Inject] public ISnackbar Snackbar { get; set; } = null!;
+    [Inject] public IDialogService DialogService { get; set; } = null!;
 
     protected bool Running { get; private set; }
 

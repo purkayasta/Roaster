@@ -29,8 +29,8 @@ builder.Services.AddMassTransit(x =>
 
         cfg.ReceiveEndpoint("code-submitted", e =>
         {
-            e.ConcurrentMessageLimit = 1;
             e.PrefetchCount = 1;
+            e.ConcurrentMessageLimit = 1;
             e.ConfigureConsumer<CodeSubmittedConsumer>(ctx);
             e.UseMessageRetry(r => r.Exponential(3,
                 TimeSpan.FromSeconds(10),

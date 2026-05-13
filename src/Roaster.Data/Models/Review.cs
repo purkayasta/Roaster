@@ -1,6 +1,6 @@
 namespace Roaster.Data.Models;
 
-public class Review
+public sealed class Review
 {
     public long Id { get; init; }
     public long SubmissionId { get; init; }

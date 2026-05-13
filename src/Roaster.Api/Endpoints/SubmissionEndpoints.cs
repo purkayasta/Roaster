@@ -14,42 +14,77 @@ public static class SubmissionEndpoints
     public static void MapSubmissionEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/api/submissions", async (SubmissionRequest req, RoasterDbContext db,
-            IPublishEndpoint publisher, HttpContext ctx, ILoggerFactory loggerFactory, CancellationToken ct) =>
+            IPublishEndpoint publisher, ILoggerFactory loggerFactory, CancellationToken ct) =>
         {
             var logger = loggerFactory.CreateLogger("Submissions");
-            var correlationId = (Guid)ctx.Items["CorrelationId"]!;
-            logger.LogInformation("Received submission for language {Language}, code length {Length} chars", req.Language, req.Code.Length);
 
-            var submission = new Submission
+            var session = await db.Sessions.FindAsync([req.SessionId], ct);
+            if (session is null)
             {
-                Payload = new CodePayload { Content = Regex.Replace(req.Code, @"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", ""), Language = req.Language },
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
+                logger.LogWarning("Session {SessionId} not found", req.SessionId);
+                return Results.NotFound($"Session {req.SessionId} not found.");
+            }
+
+            var correlationId = session.Id;
+            var sanitizedCode = Regex.Replace(req.Code, @"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "");
+
+            var existing = await db.Submissions
+                .Include(s => s.Review)
+                .FirstOrDefaultAsync(s => s.SessionId == req.SessionId, ct);
+
+            if (existing is not null && existing.Status == SubmissionStatus.Processing)
+            {
+                logger.LogWarning("Submission {Id} for session {SessionId} is currently Processing — rejecting resubmit",
+                    existing.Id, req.SessionId);
+                return Results.Conflict(
+                    "Submission is currently being reviewed. Please wait for the review to complete before resubmitting.");
+            }
 
             await using var tx = await db.Database.BeginTransactionAsync(ct);
 
-            db.Submissions.Add(submission);
-            await db.SaveChangesAsync(ct);
+            Submission submission;
+
+            if (existing is null)
+            {
+                submission = new Submission
+                {
+                    SessionId = req.SessionId,
+                    Payload   = new CodePayload { Content = sanitizedCode, Language = req.Language },
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                db.Submissions.Add(submission);
+                await db.SaveChangesAsync(ct);
+                logger.LogInformation("New submission {Id} created for session {SessionId}", submission.Id, req.SessionId);
+            }
+            else
+            {
+                submission = existing;
+
+                if (existing.Review is not null)
+                    db.Reviews.Remove(existing.Review);
+
+                submission.Payload = new CodePayload { Content = sanitizedCode, Language = req.Language };
+                submission.Status  = SubmissionStatus.Submitted;
+                await db.SaveChangesAsync(ct);  // triggers CaptureSubmissionHistory + UpdatedAt
+                logger.LogInformation("Submission {Id} updated for session {SessionId}", submission.Id, req.SessionId);
+            }
 
             db.SubmissionEvents.Add(new SubmissionEvent
             {
                 SubmissionId  = submission.Id,
                 EventType     = SubmissionEventType.Submitted,
                 CorrelationId = correlationId,
-                OccurredAt    = submission.CreatedAt
+                OccurredAt    = DateTime.UtcNow
             });
             await db.SaveChangesAsync(ct);
-
             await tx.CommitAsync(ct);
-            logger.LogInformation("Submission {Id} saved to database, publishing CodeSubmittedEvent", submission.Id);
 
-            await publisher.Publish(new CodeSubmittedEvent(
-                submission.Id,
-                correlationId,
-                submission.CreatedAt), ct);
+            logger.LogInformation("Submission {Id} saved, publishing CodeSubmittedEvent. CorrelationId={CorrelationId}",
+                submission.Id, correlationId);
 
-            logger.LogInformation("CodeSubmittedEvent published for submission {Id}", submission.Id);
+            await publisher.Publish(new CodeSubmittedEvent(submission.Id, correlationId, DateTime.UtcNow), ct);
+
             return Results.AcceptedAtRoute("GetSubmission", new { id = submission.Id }, ToDto(submission));
         }).WithName("CreateSubmission");
 
@@ -70,7 +105,7 @@ public static class SubmissionEndpoints
         app.MapGet("/api/submissions", async (int page, int pageSize, RoasterDbContext db, ILoggerFactory loggerFactory, CancellationToken ct) =>
         {
             var logger = loggerFactory.CreateLogger("Submissions");
-            page = page < 1 ? 1 : page;
+            page     = page < 1 ? 1 : page;
             pageSize = pageSize < 1 ? 20 : pageSize;
             logger.LogInformation("Listing submissions page {Page}, pageSize {PageSize}", page, pageSize);
 

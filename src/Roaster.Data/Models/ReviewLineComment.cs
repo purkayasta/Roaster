@@ -1,6 +1,6 @@
 namespace Roaster.Data.Models;
 
-public record ReviewLineComment
+public sealed record ReviewLineComment
 {
     public int LineNumber { get; init; }
     public string? Comment { get; init; }

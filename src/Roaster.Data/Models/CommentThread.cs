@@ -1,6 +1,6 @@
 namespace Roaster.Data.Models;
 
-public class CommentThread
+public sealed class CommentThread
 {
     public long Id { get; init; }
     public long ReviewId { get; init; }

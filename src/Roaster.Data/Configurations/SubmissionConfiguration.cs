@@ -11,6 +11,9 @@ public class SubmissionConfiguration : IEntityTypeConfiguration<Submission>
         builder.HasKey(s => s.Id);
         builder.Property(s => s.Id).UseIdentityByDefaultColumn();
 
+        builder.Property(s => s.SessionId).IsRequired();
+        builder.HasIndex(s => s.SessionId).IsUnique();
+
         builder.OwnsOne(s => s.Payload, b => b.ToJson("Payload"));
 
         builder.Property(s => s.Status).HasConversion<int>().IsRequired();
@@ -30,6 +33,11 @@ public class SubmissionConfiguration : IEntityTypeConfiguration<Submission>
         builder.HasMany(s => s.Events)
                .WithOne(e => e.Submission)
                .HasForeignKey(e => e.SubmissionId)
+               .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(s => s.History)
+               .WithOne(h => h.Submission)
+               .HasForeignKey(h => h.SubmissionId)
                .OnDelete(DeleteBehavior.Cascade);
 
         builder.ToTable("Submissions");

@@ -40,8 +40,11 @@ public class SubmissionEndpointTests(ApiFactory factory) : IClassFixture<ApiFact
     [Fact]
     public async Task Post_ValidRequest_Returns202()
     {
+        var sessionResp = await Client.PostAsJsonAsync("/api/sessions", new { name = "test-session" });
+        var session = await sessionResp.Content.ReadFromJsonAsync<SessionDto>();
+
         var resp = await Client.PostAsJsonAsync("/api/submissions",
-            new { code = "var x = 1;", language = "csharp" });
+            new { sessionId = session!.Id, code = "var x = 1;", language = "csharp" });
         resp.StatusCode.Should().Be(HttpStatusCode.Accepted);
     }
 
@@ -50,8 +53,12 @@ public class SubmissionEndpointTests(ApiFactory factory) : IClassFixture<ApiFact
     [Fact]
     public async Task Post_ControlCharactersStripped_BeforeSave()
     {
+        var sessionResp = await Client.PostAsJsonAsync("/api/sessions", new { name = "sanitize-session" });
+        var session = await sessionResp.Content.ReadFromJsonAsync<SessionDto>();
+
         var codeWithControl = "var x\x01 = 1\x1F;";  // contains control chars
-        await Client.PostAsJsonAsync("/api/submissions", new { code = codeWithControl, language = "csharp" });
+        await Client.PostAsJsonAsync("/api/submissions",
+            new { sessionId = session!.Id, code = codeWithControl, language = "csharp" });
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<RoasterDbContext>();
@@ -60,6 +67,34 @@ public class SubmissionEndpointTests(ApiFactory factory) : IClassFixture<ApiFact
         sub.Should().NotBeNull();
         sub!.Payload.Content.Should().NotContain("\x01");
         sub.Payload.Content.Should().NotContain("\x1F");
+    }
+
+    // ── resubmit guard ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Post_WhileProcessing_Returns409()
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RoasterDbContext>();
+        var session = new Session { Name = "processing-session", CreatedAt = DateTime.UtcNow };
+        db.Sessions.Add(session);
+        await db.SaveChangesAsync();
+
+        var sub = new Submission
+        {
+            SessionId = session.Id,
+            Payload   = new CodePayload { Content = "var x = 1;", Language = "csharp" },
+            Status    = SubmissionStatus.Processing,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+        db.Submissions.Add(sub);
+        await db.SaveChangesAsync();
+
+        var resp = await Client.PostAsJsonAsync("/api/submissions",
+            new { sessionId = session.Id, code = "var y = 2;", language = "csharp" });
+
+        resp.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
     // ── GET /api/submissions/{id} ────────────────────────────────────────────
@@ -76,10 +111,16 @@ public class SubmissionEndpointTests(ApiFactory factory) : IClassFixture<ApiFact
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<RoasterDbContext>();
+        var session = new Session { Name = "get-test", CreatedAt = DateTime.UtcNow };
+        db.Sessions.Add(session);
+        await db.SaveChangesAsync();
+
         var sub = new Submission
         {
-            Payload = new CodePayload { Content = "x", Language = "go" },
-            CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
+            SessionId = session.Id,
+            Payload   = new CodePayload { Content = "x", Language = "go" },
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
         db.Submissions.Add(sub);
         await db.SaveChangesAsync();

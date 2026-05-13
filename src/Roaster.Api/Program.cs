@@ -48,6 +48,7 @@ app.UseSerilogRequestLogging();
 app.MapScalarApiReference();
 
 app.MapOpenApi();
+app.MapSessionEndpoints();
 app.MapSubmissionEndpoints();
 app.MapReviewEndpoints();
 app.MapThreadEndpoints();

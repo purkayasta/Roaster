@@ -51,9 +51,15 @@ public class EfConfigurationTests
     public async Task SaveChangesAsync_UpdatesSubmissionUpdatedAt()
     {
         using var db = BuildDb();
+
+        var session = new Session { Name = "test", CreatedAt = DateTime.UtcNow };
+        db.Sessions.Add(session);
+        await db.SaveChangesAsync();
+
         var sub = new Submission
         {
-            Payload = new CodePayload { Content = "x", Language = "csharp" },
+            SessionId = session.Id,
+            Payload   = new CodePayload { Content = "x", Language = "csharp" },
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow.AddDays(-1)
         };

@@ -32,7 +32,16 @@ public class CodeSubmittedConsumer(
             var submission = await db.Submissions.FindAsync(msg.SubmissionId, ct);
             if (submission is null)
             {
-                logger.LogWarning("Submission {Id} not found", msg.SubmissionId);
+                logger.LogWarning("Submission {Id} not found — discarding", msg.SubmissionId);
+                return;
+            }
+
+            if (submission.Status != SubmissionStatus.Submitted)
+            {
+                logger.LogWarning(
+                    "Discarding stale CodeSubmittedEvent for SubmissionId={SubmissionId}. " +
+                    "Current status={Status} is not Submitted. CorrelationId={CorrelationId}",
+                    msg.SubmissionId, submission.Status, msg.CorrelationId);
                 return;
             }
 

@@ -2,7 +2,7 @@ namespace Roaster.Data.Models;
 
 public enum SubmissionStatus
 {
-    Pending    = 10,
+    Submitted  = 10,
     Processing = 20,
     Completed  = 30,
     Failed     = 40

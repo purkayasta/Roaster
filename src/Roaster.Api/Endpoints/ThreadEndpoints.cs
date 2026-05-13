@@ -14,11 +14,15 @@ public static class ThreadEndpoints
     {
         app.MapPost("/api/submissions/{submissionId:long}/reviews/{reviewId:long}/lines/{lineNumber:int}/threads",
             async (long submissionId, long reviewId, int lineNumber, ReplyRequest req, RoasterDbContext db,
-                IPublishEndpoint publisher, HttpContext ctx, ILoggerFactory loggerFactory, CancellationToken ct) =>
+                IPublishEndpoint publisher, ILoggerFactory loggerFactory, CancellationToken ct) =>
             {
                 var logger = loggerFactory.CreateLogger("Threads");
-                var correlationId = (Guid)ctx.Items["CorrelationId"]!;
                 logger.LogInformation("User reply received for submission {SubmissionId}, review {ReviewId}, line {LineNumber}", submissionId, reviewId, lineNumber);
+
+                var correlationId = await db.Submissions
+                    .Where(s => s.Id == submissionId)
+                    .Select(s => s.SessionId)
+                    .FirstOrDefaultAsync(ct);
 
                 await using var tx = await db.Database.BeginTransactionAsync(ct);
 

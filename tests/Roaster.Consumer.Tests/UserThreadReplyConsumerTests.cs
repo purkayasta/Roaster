@@ -32,10 +32,16 @@ public class UserThreadReplyConsumerTests : IDisposable
     private async Task<(Submission sub, Review review, CommentThread thread)> SeedThread(
         List<ThreadReply>? replies = null)
     {
+        var session = new Session { Name = "test", CreatedAt = DateTime.UtcNow };
+        _db.Sessions.Add(session);
+        await _db.SaveChangesAsync();
+
         var sub = new Submission
         {
-            Payload = new CodePayload { Content = "var x = 1;", Language = "csharp" },
-            CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
+            SessionId = session.Id,
+            Payload   = new CodePayload { Content = "var x = 1;", Language = "csharp" },
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
         _db.Submissions.Add(sub);
         await _db.SaveChangesAsync();

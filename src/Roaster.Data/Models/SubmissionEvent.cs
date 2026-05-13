@@ -1,6 +1,6 @@
 namespace Roaster.Data.Models;
 
-public class SubmissionEvent
+public sealed class SubmissionEvent
 {
     public long Id { get; init; }
     public long SubmissionId { get; init; }

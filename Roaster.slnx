@@ -1,3 +1,19 @@
 <Solution>
-  <Project Path="Editor/Editor.csproj" />
+  <Folder Name="/Backend/">
+    <Project Path="src/Roaster.Data/Roaster.Data.csproj" />
+    <Project Path="src/Roaster.Contracts/Roaster.Contracts.csproj" />
+    <Project Path="src/Roaster.Api/Roaster.Api.csproj" />
+    <Project Path="src/Roaster.Consumer/Roaster.Consumer.csproj" />
+    <Project Path="src/Roaster.Reviewer/Roaster.Reviewer.csproj" />
+    <Project Path="src/Roaster.Migration/Roaster.Migration.csproj" />
+  </Folder>
+  <Folder Name="/Frontend/">
+    <Project Path="src/Roaster.Editor/Roaster.Editor.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="tests/Roaster.Api.Tests/Roaster.Api.Tests.csproj" />
+    <Project Path="tests/Roaster.Consumer.Tests/Roaster.Consumer.Tests.csproj" />
+    <Project Path="tests/Roaster.Data.Tests/Roaster.Data.Tests.csproj" />
+    <Project Path="tests/Roaster.Reviewer.Tests/Roaster.Reviewer.Tests.csproj" />
+  </Folder>
 </Solution>

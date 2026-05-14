@@ -14,6 +14,9 @@ var apiOptions = builder.Configuration.GetSection("Api").Get<ApiOptions>()
 if (string.IsNullOrWhiteSpace(apiOptions.BaseUrl))
     throw new InvalidOperationException("Api:BaseUrl is required.");
 
+builder.Services.AddHttpClient<SessionService>(client =>
+    client.BaseAddress = new Uri(apiOptions.BaseUrl));
+
 builder.Services.AddHttpClient<SubmissionService>(client =>
     client.BaseAddress = new Uri(apiOptions.BaseUrl));
 

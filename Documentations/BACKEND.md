@@ -20,8 +20,21 @@ All projects target **.NET 10**.
 ```
 POST /api/sessions
   → Validates CreateSessionRequest (name: 1–255 chars)
-  → Saves Session to Postgres
+  → Saves Session to Postgres (IsActive = true)
   → Returns 201 Created with SessionDto
+
+GET /api/sessions
+  → Queries Sessions (IsActive = true) with LEFT JOIN on Submission
+  → Returns paginated SessionSubmissionDto list (sessions without submissions have null Language/Status)
+  → Query params: page, pageSize
+
+GET /api/sessions/{id}
+  → Returns SessionDetailDto (name, code content, language, status)
+  → 404 if not found or soft-deleted
+
+DELETE /api/sessions/{id}
+  → Soft delete: sets IsActive = false
+  → 204 No Content; 404 if not found
 
 POST /api/submissions
   → CorrelationIdMiddleware (generates/extracts X-Correlation-Id UUID into Serilog + response header)
@@ -34,6 +47,9 @@ POST /api/submissions
   → Logs SubmissionEvent(Submitted) with correlationId = session.Id
   → Publishes CodeSubmittedEvent to RabbitMQ
   → Returns 202 Accepted
+
+GET /api/submissions/{id}
+  → Returns single SubmissionDto; 404 if not found
 
 RabbitMQ: code-submitted queue (PrefetchCount=1, ConcurrentMessageLimit=1)
   → CodeSubmittedConsumer
@@ -61,12 +77,6 @@ RabbitMQ: user-thread-reply queue
 
 GET /api/threads/{threadId}/replies
   → Returns ordered conversation (user/AI alternating)
-
-GET /api/submissions
-  → Paginated list, ordered by CreatedAt DESC (query params: page, pageSize)
-
-GET /api/submissions/{id}
-  → Returns single SubmissionDto; 404 if not found
 ```
 
 ---
@@ -76,8 +86,10 @@ GET /api/submissions/{id}
 | Method | Path | Returns | Notes |
 |---|---|---|---|
 | POST | `/api/sessions` | 201 `SessionDto` | Create session |
+| GET | `/api/sessions` | 200 `SessionSubmissionDto[]` | `page`, `pageSize` query params |
+| GET | `/api/sessions/{id}` | 200 `SessionDetailDto` | Session + submission detail |
+| DELETE | `/api/sessions/{id}` | 204 | Soft delete (sets IsActive=false) |
 | POST | `/api/submissions` | 202 `SubmissionDto` | Submit/resubmit code |
-| GET | `/api/submissions` | 200 `SubmissionDto[]` | `page`, `pageSize` query params |
 | GET | `/api/submissions/{id}` | 200 `SubmissionDto` | Single submission |
 | GET | `/api/submissions/{id}/review` | 204 / 200 `ReviewDto` | Poll until completed |
 | POST | `/api/submissions/{subId}/reviews/{revId}/lines/{lineNum}/threads` | 201 | User reply |
@@ -94,7 +106,7 @@ OpenAPI/Scalar UI: `/scalar/v1` (development only).
 
 | Entity | PK | Key Columns | Notes |
 |---|---|---|---|
-| `Session` | UUID | `Name varchar(255)`, `CreatedAt` | One session → one submission |
+| `Session` | UUID | `Name varchar(255)`, `CreatedAt`, `IsActive bool` | Soft delete via `IsActive`; one session → one submission |
 | `Submission` | bigserial | `SessionId UUID (unique FK)`, `Payload JSONB`, `Status smallint` | Unique on SessionId |
 | `Review` | bigserial | `SubmissionId FK`, `Summary text`, `Comments JSONB` | Created by consumer |
 | `CommentThread` | bigserial | `ReviewId FK`, `LineNumber int` | Unique (ReviewId, LineNumber) |
@@ -123,11 +135,15 @@ OpenAPI/Scalar UI: `/scalar/v1` (development only).
 - `Review.Comments` → `List<ReviewLineComment>` — JSONB array
 - `SubmissionEvent.Metadata` — JSONB for arbitrary event context
 
+**Session soft delete.** `Session.IsActive` defaults to `true`. `DELETE /api/sessions/{id}` sets it `false`. All `GET /api/sessions` queries filter `IsActive = true`.
+
 **Session ↔ Submission (1:1).** `SessionId` on `Submission` has a unique constraint. Each session has at most one live submission. Resubmitting replaces the payload and deletes the existing `Review` (if any); the old payload is preserved in `SubmissionHistory`.
+
+**Dashboard query direction.** `GET /api/sessions` queries from `Sessions` and LEFT JOINs `Submission`, so sessions without any submission appear in the list with null Language/Status/SubmissionId.
 
 **SubmissionHistory auto-capture.** `RoasterDbContext.SaveChangesAsync` detects modified `Submission.Payload` and writes a `SubmissionHistory` row automatically, without callers needing to do it.
 
-**CorrelationId in SubmissionEvents = SessionId.** The `CorrelationId` stored in `SubmissionEvent` rows is the Session's UUID (i.e. `session.Id`), not the HTTP-header UUID. The `CorrelationIdMiddleware` UUID only flows into Serilog context and the `X-Correlation-Id` response header.
+**CorrelationId in SubmissionEvents = SessionId.** The `CorrelationId` stored in `SubmissionEvent` rows is the Session's UUID, not the HTTP-header UUID. The `CorrelationIdMiddleware` UUID only flows into Serilog context and the `X-Correlation-Id` response header.
 
 **MassTransit retry config.**
 - `CodeSubmittedConsumer`: `Exponential(3, start=10 s, max=120 s, increment=10 s)`.

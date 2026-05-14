@@ -102,23 +102,6 @@ public static class SubmissionEndpoints
             return Results.Ok(ToDto(submission));
         }).WithName("GetSubmission");
 
-        app.MapGet("/api/submissions", async (int page, int pageSize, RoasterDbContext db, ILoggerFactory loggerFactory, CancellationToken ct) =>
-        {
-            var logger = loggerFactory.CreateLogger("Submissions");
-            page     = page < 1 ? 1 : page;
-            pageSize = pageSize < 1 ? 20 : pageSize;
-            logger.LogInformation("Listing submissions page {Page}, pageSize {PageSize}", page, pageSize);
-
-            var results = await db.Submissions
-                .OrderByDescending(s => s.CreatedAt)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .Select(s => ToDto(s))
-                .ToListAsync(ct);
-
-            logger.LogInformation("Returning {Count} submissions", results.Count);
-            return Results.Ok(results);
-        }).WithName("ListSubmissions");
     }
 
     private static SubmissionDto ToDto(Submission s) =>

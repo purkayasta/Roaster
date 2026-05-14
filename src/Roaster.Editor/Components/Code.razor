@@ -1,22 +1,70 @@
-<div style="height: 100vh;">
-    <StandaloneCodeEditor @ref="_editor"
-                          Id="code-editor-main"
-                          ConstructionOptions="EditorOptions" />
-</div>
+@inherits EditorComponentBase
+@inject IJSRuntime JS
+
+<MudStack Spacing="0" Style="height: 100%;">
+    <MudPaper Elevation="1" Class="px-3 py-2" Style="background:#2d2d2d; border-radius:0;">
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudSelect T="string" Value="_language" ValueChanged="OnLanguageChangedAsync"
+                       Dense="true" Variant="Variant.Outlined" Margin="Margin.Dense"
+                       Style="max-width:160px; background:#3c3c3c;" Label="Language">
+                @foreach (var lang in CodeUtils.Languages)
+                {
+                    <MudSelectItem Value="@lang">@lang</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="string" Value="_theme" ValueChanged="OnThemeChangedAsync"
+                       Dense="true" Variant="Variant.Outlined" Margin="Margin.Dense"
+                       Style="max-width:150px; background:#3c3c3c;" Label="Theme">
+                @foreach (var (key, label) in CodeUtils.Themes)
+                {
+                    <MudSelectItem Value="@key">@label</MudSelectItem>
+                }
+            </MudSelect>
+        </MudStack>
+    </MudPaper>
+    <div style="height: calc(100vh - 180px);">
+        <StandaloneCodeEditor @ref="_editor" Id="code-editor-main" ConstructionOptions="BuildOptions" />
+    </div>
+</MudStack>
 
 @code {
-    private StandaloneCodeEditor _editor = null!;
+    [Parameter] public string? Content { get; set; }
+    [Parameter] public string? Language { get; set; }
 
-    private StandaloneEditorConstructionOptions EditorOptions(StandaloneCodeEditor _) => new()
+    private StandaloneCodeEditor _editor = null!;
+    private string _language = CodeUtils.DefaultLanguage;
+    private string _theme    = CodeUtils.DefaultTheme;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(Language))
+            _language = Language;
+
+        await RunLogException(async () => await ThemeFactory.EnsureAllAsync(JS));
+    }
+
+    private StandaloneEditorConstructionOptions BuildOptions(StandaloneCodeEditor _) => new()
     {
         AutomaticLayout      = true,
-        Language             = "csharp",
-        Value                = "// Paste your code here\n",
-        Theme                = "vs-dark",
+        Language             = _language,
+        Value                = string.IsNullOrWhiteSpace(Content) ? CodeUtils.DefaultBoilerplate : Content,
+        Theme                = _theme,
         WordWrap             = "on",
         ScrollBeyondLastLine = false,
         Minimap              = new EditorMinimapOptions { Enabled = false },
         LineNumbers          = "on",
         FontSize             = 14,
     };
+
+    private async Task OnLanguageChangedAsync(string language)
+    {
+        _language = language;
+        await CodeUtils.SetLanguageAsync(JS, _editor, language);
+    }
+
+    private async Task OnThemeChangedAsync(string theme)
+    {
+        _theme = theme;
+        await CodeUtils.SetThemeAsync(JS, theme);
+    }
 }

@@ -7,6 +7,7 @@ public abstract class EditorComponentBase : ComponentBase
 {
     [Inject] public ISnackbar Snackbar { get; set; } = null!;
     [Inject] public IDialogService DialogService { get; set; } = null!;
+    [Inject] public NavigationManager Navigation { get; set; } = null!;
 
     protected bool Running { get; private set; }
 

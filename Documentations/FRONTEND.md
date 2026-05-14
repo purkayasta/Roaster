@@ -14,25 +14,35 @@
 src/Roaster.Editor/
 ├── App.razor                    # Router, NotFound fallback
 ├── _Imports.razor               # Global @using (System, MudBlazor, BlazorMonaco, Services)
-├── Program.cs                   # WASM host: HttpClient, MudBlazor DI, ApiOptions
+├── Program.cs                   # WASM host: HttpClient registrations, MudBlazor DI, ApiOptions
 ├── Pages/
-│   ├── Index.razor              # "/" — dashboard, renders <Submissions />
-│   ├── Session.razor            # "/session/{Id}/{Name}" — session detail view
+│   ├── Index.razor              # "/" — session dashboard, action handlers (new/edit/delete)
+│   ├── Session.razor            # "/session/{Id}" — session detail, renders <Code />
 │   └── NotFound.razor           # Catch-all 404 page
 ├── Components/
-│   ├── Code.razor               # Monaco editor (BlazorMonaco); vs-dark, csharp, 14px
-│   └── Submissions.razor        # MudDataGrid listing all submissions with pagination
+│   ├── Code.razor               # Monaco editor wrapper; language + theme dropdowns
+│   ├── SessionView.razor        # MudDataGrid of sessions with edit/delete action buttons
+│   └── Submissions.razor        # Legacy component (unused on any page)
 ├── Shared/
-│   ├── NewSessionDialog.razor   # MudDialog — enter name, generates client-side UUID, navigates to session
-│   └── EditorComponentBase.cs  # Abstract base: Running flag, Snackbar/DialogService injection, RunLogException
+│   ├── NewSessionDialog.razor   # MudDialog — enter name, closes with name string
+│   ├── EditorComponentBase.cs   # Abstract base: Running flag, injected services, RunLogException
+│   └── MainLayout.razor / NavMenu.razor
 ├── Layout/
-│   ├── MainLayout.razor         # Shell layout
+│   ├── MainLayout.razor         # Shell layout with sidebar
 │   └── NavMenu.razor            # Navigation sidebar
+├── Resources/
+│   └── NordDark.json            # Nord dark theme definition (EmbeddedResource)
 └── Services/
-    ├── SubmissionService.cs     # HttpClient wrapper: GET /api/submissions (page, pageSize)
+    ├── SessionService.cs        # All session API calls (GET list, GET by id, POST, DELETE)
+    ├── SubmissionService.cs     # Placeholder for future submission API calls
+    ├── CodeUtils.cs             # Static helpers: language list, theme list, SetLanguage/SetTheme
+    ├── ThemeFactory.cs          # Custom Monaco theme registry + one-time registration
     ├── ApiOptions.cs            # Record bound from "Api" config section (BaseUrl)
     └── Models/
-        └── SubmissionResponse.cs  # record(Id, Language, Status, CreatedAt, UpdatedAt)
+        ├── SessionSubmissionResponse.cs  # record(SubmissionId?, SessionId, SessionName, Language?, Status?, SessionCreatedAt)
+        ├── SessionDetailResponse.cs      # record(Id, Name, CreatedAt, CodeContent?, Language?, Status?)
+        ├── SessionResponse.cs            # record(Id, Name, CreatedAt) — returned from POST /api/sessions
+        └── SubmissionResponse.cs         # Legacy model (unused)
 ```
 
 ---
@@ -41,45 +51,118 @@ src/Roaster.Editor/
 
 | Route | Component | What it shows |
 |---|---|---|
-| `/` | `Index.razor` | `<Submissions />` grid of all submissions |
-| `/session/{Id}/{Name}` | `Session.razor` | Session name + UUID; Id defaults to a new Guid if omitted |
+| `/` | `Index.razor` | Session list via `<SessionView />` |
+| `/session/{Id}` | `Session.razor` | Session name, status chip, `<Code />` editor |
 | `*` | `NotFound.razor` | 404 message |
+
+---
+
+## Pages
+
+### `Index.razor`
+Owns all session action handlers — no decision logic lives in child components.
+
+- On init: calls `SessionService.GetAllAsync(pageSize: 50)` and passes result to `<SessionView />`.
+- **New** button: opens `NewSessionDialog`, gets name string back, calls `SessionService.CreateAsync(name)`, navigates to `/session/{id}`.
+- **Edit** handler: `Navigation.NavigateTo($"/session/{sessionId}")`.
+- **Delete** handler: calls `SessionService.DeleteAsync(sessionId)`, then removes from local `_sessions` list (no refetch needed).
+
+### `Session.razor`
+Route: `/session/{Id}` and `/session/` (no id).
+
+- On params set: parses `Id` as Guid, calls `SessionService.GetByIdAsync(sessionId)`.
+- Shows session name (h5) + UUID caption + status chip (color-coded by string value).
+- Always renders `<Code Content Language />` — shows boilerplate when session has no submission.
+- `StatusColor`: `"Completed"` → Success, `"Processing"` → Warning, `"Failed"` → Error, default → Default.
 
 ---
 
 ## Components
 
-### `Submissions.razor`
-Inherits `EditorComponentBase`. On init, calls `SubmissionService.GetAllAsync()` and renders a `MudDataGrid` (columns: ID, Language, Status, Created At). Shows a `MudProgressCircular` spinner while `Running`. Has a "New" button that opens `NewSessionDialog`.
+### `SessionView.razor`
+Inherits `EditorComponentBase`. Renders a `MudDataGrid` with columns: Session Name, Language, Created At, Action.
 
-### `NewSessionDialog.razor`
-MudDialog — user enters a session name. On "Start Now", generates a `Guid.NewGuid()` client-side, closes the dialog, and navigates to `/session/{id}/{encodedName}`. Does **not** call `POST /api/sessions` — session is registered in the URL only at this stage.
+Parameters (all `EditorRequired`):
+- `Sessions` — `List<SessionSubmissionResponse>`
+- `PageSize` — `int` (controls `RowsPerPage` on the grid)
+- `OnEdit` — `EventCallback<Guid>` fired with `SessionId` on edit click
+- `OnDelete` — `EventCallback<Guid>` fired with `SessionId` on delete click
+
+Child component emits events only — all navigation and API calls happen in the parent (`Index.razor`).
 
 ### `Code.razor`
-Wraps `StandaloneCodeEditor` from BlazorMonaco. Options: `AutomaticLayout=true`, `Language="csharp"`, `Theme="vs-dark"`, `WordWrap="on"`, minimap disabled, `LineNumbers="on"`, `FontSize=14`. Default placeholder: `// Paste your code here`.
+Wraps `StandaloneCodeEditor` from BlazorMonaco. Toolbar has language and theme dropdowns.
+
+Parameters:
+- `Content` — pre-fills editor (falls back to `CodeUtils.DefaultBoilerplate`)
+- `Language` — pre-selects language (falls back to `CodeUtils.DefaultLanguage = "csharp"`)
+
+On init: calls `ThemeFactory.EnsureAllAsync(JS)` inside `RunLogException` (theme failure is non-fatal, editor falls back to built-in themes). Language and theme changes call `CodeUtils.SetLanguageAsync` / `CodeUtils.SetThemeAsync` which invoke BlazorMonaco JS interop.
+
+### `NewSessionDialog.razor`
+MudDialog — user enters a session name. Buttons: Cancel (closes dialog cancelled), Confirm (closes dialog with name string). Does **not** make any API calls — the caller owns session creation.
 
 ---
 
 ## Services
 
-### `SubmissionService`
+### `SessionService`
 Primary constructor; receives `HttpClient` (base address set to `Api:BaseUrl`).
 
 ```csharp
 GetAllAsync(int page = 1, int pageSize = 20, CancellationToken ct)
-  → GET /api/submissions?page={page}&pageSize={pageSize}
-  → returns List<SubmissionResponse>
+  → GET /api/sessions?page={page}&pageSize={pageSize}
+  → returns List<SessionSubmissionResponse>
+
+GetByIdAsync(Guid sessionId, CancellationToken ct)
+  → GET /api/sessions/{sessionId}
+  → returns SessionDetailResponse
+
+CreateAsync(string name, CancellationToken ct)
+  → POST /api/sessions  { Name = name }
+  → returns SessionResponse
+
+DeleteAsync(Guid sessionId, CancellationToken ct)
+  → DELETE /api/sessions/{sessionId}
 ```
+
+### `SubmissionService`
+Empty shell registered in `Program.cs`. Placeholder for future submission-related API calls (submit code, poll review, thread replies).
+
+### `CodeUtils`
+Static class in `Services/`. Centralises editor configuration:
+
+```csharp
+DefaultBoilerplate  // "// Paste your code here and click Submit to get a review.\n"
+DefaultLanguage     // "csharp"
+DefaultTheme        // "vs-dark"
+Languages           // ["csharp", "javascript", "typescript", "json"]
+Themes              // BuiltInThemes + ThemeFactory.CustomThemes
+SetLanguageAsync(IJSRuntime, StandaloneCodeEditor, string language)
+SetThemeAsync(IJSRuntime, string theme)
+```
+
+### `ThemeFactory`
+Static class. Owns the custom Monaco theme registry.
+
+- `Registry` — `Dictionary<string, (Label, ResourcePath)>` for each custom theme JSON (EmbeddedResource).
+- `Defined` — `static HashSet<string>` guards one-time registration per app session; safe across component remounts.
+- `CustomThemes` — exposes `(Key, Label)` pairs for use in dropdowns.
+- `EnsureAllAsync(IJSRuntime)` — iterates registry, deserializes JSON from assembly manifest, calls `EditorGlobal.DefineTheme`. Skips already-defined themes.
+
+To add a new theme: add a JSON file to `Resources/`, mark it `EmbeddedResource` in the csproj, add one entry to `ThemeFactory.Registry`.
+
+Current custom themes: `nord-dark` (Nord palette — Polar Night backgrounds, Snow Storm foreground, Frost for keywords/types, Aurora for strings/numbers/errors).
 
 ---
 
 ## Base Class: `EditorComponentBase`
 
-All page/component classes that need async error handling should inherit this.
+All pages and components inherit this.
 
 - `Running` — set `true` at start of async op, `false` on completion; triggers `StateHasChanged()` automatically.
 - `RunLogException(Func<Task>)` / `RunLogException(Action)` — wraps work in try/catch; shows `Snackbar` error on exception.
-- Injects `ISnackbar` and `IDialogService`.
+- Injects: `ISnackbar`, `IDialogService`, `NavigationManager`.
 
 ---
 
@@ -96,9 +179,10 @@ No CDN dependencies — all UI libraries are NuGet packages.
 
 ## Conventions
 
-- `.razor.css` scoped styles per component.
+- `.razor.css` scoped styles per component where needed.
 - `_Imports.razor` holds all global `@using` statements.
-- `IJSRuntime` used via `InvokeVoidAsync` / `InvokeAsync<T>` where needed.
-- `EventCallback<T>` for child→parent communication.
+- `EventCallback<T>` for child → parent communication. Child components emit events only; action logic lives in the owning page.
+- `NavigationManager` injected via `EditorComponentBase` — no need to inject in individual pages/components.
 - State mutations outside event handlers require explicit `StateHasChanged()`.
-- To add more API calls: add methods to `SubmissionService` or create a new service registered in `Program.cs`. No component changes needed for service swaps.
+- To add a new API call: add a method to `SessionService` (session-related) or `SubmissionService` (submission-related), or register a new typed `HttpClient` in `Program.cs`.
+- BlazorMonaco JS interop: use `@using EditorGlobal = BlazorMonaco.Editor.Global` alias to avoid ambiguity with `BlazorMonaco.Languages.Global`.

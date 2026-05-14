@@ -4,7 +4,8 @@ COPY Roaster.slnx ./
 COPY src/ src/
 RUN dotnet restore src/Roaster.Editor/Roaster.Editor.csproj
 RUN dotnet publish src/Roaster.Editor/Roaster.Editor.csproj \
-    -c Release -o /app/publish --no-restore
+    -c Release -o /app/publish --no-restore \
+    -p:WasmFingerprintAssets=false
 
 FROM nginx:alpine AS runtime
 COPY --from=build /app/publish/wwwroot /usr/share/nginx/html

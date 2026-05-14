@@ -51,16 +51,20 @@ docker-compose up --build
 
 **Thread replies:** User posts to `/api/submissions/{subId}/reviews/{revId}/lines/{lineNum}/threads` → `UserThreadReplyConsumer` builds chat history → AI reply saved → `GET /api/threads/{threadId}/replies` returns conversation.
 
-**Key tech:** ASP.NET Core 10 (Minimal APIs) · EF Core 10 + Npgsql (Postgres 17) · MassTransit 8 + RabbitMQ · Semantic Kernel 1.74.0 + Ollama (`qwen2.5-coder:7b`) · Blazor WASM 10 · MudBlazor 9.4 · DbUp 7.
+**Key tech:** ASP.NET Core 10 (Minimal APIs) · EF Core 10 + Npgsql (Postgres 17-alpine) · MassTransit 8 + RabbitMQ · Semantic Kernel 1.74.0 + Ollama (`qwen2.5-coder:7b`) · Blazor WASM 10 · MudBlazor 9.4 · BlazorMonaco 3.4 · DbUp 7.
 
 **JSONB columns:** `Submission.Payload` (code + language), `Review.Comments` (line comments array), `SubmissionEvent.Metadata`.
 
 **1:1 Session ↔ Submission.** Each session has at most one live submission. Resubmitting replaces the payload, deletes the existing review, and auto-captures the old payload in `SubmissionHistory`.
 
+**Soft delete.** Sessions are soft-deleted via `IsActive = false`. All list queries filter `IsActive = true`.
+
 **Status enum (smallint):** 10=Submitted, 20=Processing, 30=Completed, 40=Failed.
 
 **Retry:** `CodeSubmittedConsumer` — exponential (3 attempts, 10 s–120 s). `UserThreadReplyConsumer` — fixed [3 s, 10 s, 30 s].
 
-**Frontend:** Dashboard (`/`) lists submissions via `MudDataGrid`. "New" button opens `NewSessionDialog` which generates a client-side UUID and navigates to `/session/{id}/{name}`. `SubmissionService` calls real API at `Api:BaseUrl` (default `http://localhost:8080`).
+**Frontend:** Dashboard (`/`) lists sessions via `SessionView` (`MudDataGrid`). "New" button opens `NewSessionDialog`, calls `POST /api/sessions`, navigates to `/session/{id}`. All action handlers (new/edit/delete) live in `Index.razor`; child components emit `EventCallback<Guid>` only. `Session.razor` loads session detail and renders the Monaco editor (`Code.razor`) with language + theme dropdowns. Custom themes (e.g. Nord Dark) are JSON `EmbeddedResource` files registered by `ThemeFactory` once per app session.
+
+**Services:** `SessionService` owns all session API calls. `SubmissionService` is a registered placeholder for future submission calls. Both are typed `HttpClient` clients registered in `Program.cs`.
 
 **Tests:** xUnit + Moq + FluentAssertions. Api tests use `WebApplicationFactory` + EF InMemory + mocked `IPublishEndpoint`. Consumer tests use `FakeConsumeContext`. No real broker or database needed for tests.

@@ -12,6 +12,7 @@ public class SessionConfiguration : IEntityTypeConfiguration<Session>
         builder.Property(s => s.Id).ValueGeneratedOnAdd();
         builder.Property(s => s.Name).HasMaxLength(255).IsRequired();
         builder.Property(s => s.CreatedAt).IsRequired();
+        builder.Property(s => s.IsActive).HasDefaultValue(true).IsRequired();
 
         builder.HasOne(s => s.Submission)
                .WithOne(sub => sub.Session)

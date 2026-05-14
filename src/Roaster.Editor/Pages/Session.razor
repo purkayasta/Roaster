@@ -1,21 +1,60 @@
-@page "/session/{Id}/"
+@page "/session/{Id}"
 @page "/session/"
+@inherits EditorComponentBase
+@inject SessionService SessionService
 
-
-<PageTitle>Code Session — @Name</PageTitle>
+<PageTitle>@(_session?.Name ?? "Session")</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.False" Class="pa-4">
-    <MudText Typo="Typo.h5" Class="mb-1">@Name</MudText>
-    <MudText Typo="Typo.caption" Class="mb-4" Color="Color.Secondary">@Id</MudText>
+    @if (Running)
+    {
+        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height: 60vh;">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </MudStack>
+    }
+    else if (_session is null)
+    {
+        <MudText Color="Color.Error">Session not found.</MudText>
+    }
+    else
+    {
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.h5">@_session.Name</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@Id</MudText>
+            </MudStack>
+            @if (_session.Status is not null)
+            {
+                <MudChip T="string" Color="StatusColor(_session.Status)" Variant="Variant.Filled">
+                    @_session.Status
+                </MudChip>
+            }
+        </MudStack>
+
+        <Code Content="@_session.CodeContent" Language="@_session.Language" />
+    }
 </MudContainer>
 
 @code {
     [Parameter] public string? Id { get; set; }
-    [Parameter] public string Name { get; set; } = string.Empty;
 
-    protected override void OnParametersSet()
+    private SessionDetailResponse? _session;
+
+    protected override async Task OnParametersSetAsync()
     {
-        if (string.IsNullOrEmpty(Id))
-            Id = Guid.NewGuid().ToString();
+        if (!Guid.TryParse(Id, out var sessionId)) return;
+
+        await RunLogException(async () =>
+        {
+            _session = await SessionService.GetByIdAsync(sessionId);
+        });
     }
+
+    private static Color StatusColor(string status) => status switch
+    {
+        "Completed"  => Color.Success,
+        "Processing" => Color.Warning,
+        "Failed"     => Color.Error,
+        _            => Color.Default
+    };
 }

@@ -1,8 +1,66 @@
 @page "/"
+@inherits EditorComponentBase
+@inject SessionService SessionService
 
 <PageTitle>Dashboard</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.False" Class="pa-4">
-    <MudText Typo="Typo.h5" Class="mb-4">Submissions</MudText>
-    <Submissions />
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+        <MudText Typo="Typo.h5">Sessions</MudText>
+        <MudButton StartIcon="@Icons.Material.Filled.Add"
+                   Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="OpenNewSessionDialog">
+            New
+        </MudButton>
+    </MudStack>
+
+    @if (Running)
+    {
+        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height: 60vh;">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </MudStack>
+    }
+    else
+    {
+        <SessionView Sessions="_sessions" PageSize="20" OnEdit="EditSessionAsync" OnDelete="DeleteSessionAsync" />
+    }
 </MudContainer>
+
+@code {
+    private List<SessionSubmissionResponse> _sessions = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RunLogException(async () =>
+        {
+            _sessions = await SessionService.GetAllAsync(pageSize: 50);
+        });
+    }
+
+    private async Task OpenNewSessionDialog()
+    {
+        var dialog = await DialogService.ShowAsync<NewSessionDialog>("New Code Session");
+        var result = await dialog.Result;
+        if (result is { Canceled: false, Data: string name })
+        {
+            await RunLogException(async () =>
+            {
+                var session = await SessionService.CreateAsync(name);
+                Navigation.NavigateTo($"/session/{session.Id}");
+            });
+        }
+    }
+
+    private void EditSessionAsync(Guid sessionId) =>
+        Navigation.NavigateTo($"/session/{sessionId}");
+
+    private async Task DeleteSessionAsync(Guid sessionId)
+    {
+        await RunLogException(async () =>
+        {
+            await SessionService.DeleteAsync(sessionId);
+            _sessions.RemoveAll(s => s.SessionId == sessionId);
+        });
+    }
+}

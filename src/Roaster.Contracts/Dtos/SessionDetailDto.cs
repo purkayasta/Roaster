@@ -6,4 +6,5 @@ public sealed record SessionDetailDto(
     DateTime CreatedAt,
     string? CodeContent,
     string? Language,
-    string? Status);
+    string? Status,
+    long? SubmissionId);

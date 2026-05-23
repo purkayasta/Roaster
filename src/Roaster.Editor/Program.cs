@@ -20,6 +20,9 @@ builder.Services.AddHttpClient<SessionService>(client =>
 builder.Services.AddHttpClient<SubmissionService>(client =>
     client.BaseAddress = new Uri(apiOptions.BaseUrl));
 
+builder.Services.AddHttpClient<ReviewService>(client =>
+    client.BaseAddress = new Uri(apiOptions.BaseUrl));
+
 builder.Services.AddMudServices();
 
 await builder.Build().RunAsync();

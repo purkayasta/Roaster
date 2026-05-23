@@ -12,6 +12,35 @@
     <link href="Roaster.Editor.styles.css" rel="stylesheet" />
     <style>
         #code-editor-main { height: 100%; }
+
+        /* Glyph margin icons for review comments */
+        .roaster-glyph-error   { background: #f44336; border-radius: 50%; width: 10px !important; height: 10px !important; margin: 4px; }
+        .roaster-glyph-warning { background: #ff9800; border-radius: 50%; width: 10px !important; height: 10px !important; margin: 4px; }
+        .roaster-glyph-info    { background: #2196f3; border-radius: 50%; width: 10px !important; height: 10px !important; margin: 4px; }
+
+        /* Line highlight */
+        .roaster-line-error   { background: rgba(244,  67,  54, 0.08) !important; }
+        .roaster-line-warning { background: rgba(255, 152,   0, 0.08) !important; }
+        .roaster-line-info    { background: rgba( 33, 150, 243, 0.08) !important; }
+
+        /* Review comment box rendered inside Monaco ViewZone */
+        .roaster-review-comment {
+            padding: 8px 12px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 13px;
+            border-left: 3px solid #555;
+            background: var(--mud-palette-surface, #1e1e1e);
+            color: var(--mud-palette-text-primary, #d4d4d4);
+            box-sizing: border-box;
+            width: 100%;
+        }
+        .roaster-review-header  { display: flex; align-items: center; margin-bottom: 4px; }
+        .roaster-severity-chip  { height: 20px !important; font-size: 11px !important; }
+        .roaster-comment-text   { margin: 4px 0; }
+        .roaster-replies        { display: flex; flex-direction: column; gap: 6px; }
+        .roaster-reply          { padding: 4px 8px; border-radius: 4px; }
+        .roaster-reply-ai       { background: rgba(33, 150, 243, 0.12); border-left: 2px solid #2196f3; }
+        .roaster-reply-user     { background: rgba(76, 175, 80,  0.12); border-left: 2px solid #4caf50; }
     </style>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
 </head>
@@ -29,6 +58,7 @@
     <script src="_content/BlazorMonaco/jsInterop.js"></script>
     <script src="_content/BlazorMonaco/lib/monaco-editor/min/vs/loader.js"></script>
     <script src="_content/BlazorMonaco/lib/monaco-editor/min/vs/editor/editor.main.js"></script>
+    <script src="reviewZones.js"></script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
 </body>
 

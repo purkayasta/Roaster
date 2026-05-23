@@ -6,4 +6,5 @@ public record SessionDetailResponse(
     DateTime CreatedAt,
     string? CodeContent,
     string? Language,
-    string? Status);
+    string? Status,
+    long? SubmissionId);

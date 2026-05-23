@@ -1,0 +1,164 @@
+@inherits EditorComponentBase
+@inject ReviewService ReviewService
+@implements IAsyncDisposable
+
+<div class="roaster-review-comment">
+    <div class="roaster-review-header">
+        <MudChip T="string" Size="Size.Small" Color="CodeUtils.GetSeverityColor(CommentData.Severity)"
+                 Variant="Variant.Filled" Class="roaster-severity-chip">
+            @CommentData.Severity
+        </MudChip>
+        <MudText Typo="Typo.caption" Class="ml-2" Style="opacity:0.7;">Line @CommentData.LineNumber</MudText>
+    </div>
+
+    <MudText Typo="Typo.body2" Class="roaster-comment-text">@CommentData.Comment</MudText>
+
+    @if (_replies.Count > 0)
+    {
+        <MudDivider Class="my-2" />
+        <div class="roaster-replies">
+            @foreach (var reply in _replies)
+            {
+                <div class="roaster-reply @(reply.IsAiReply ? "roaster-reply-ai" : "roaster-reply-user")">
+                    <MudText Typo="Typo.caption" Style="font-weight:600; opacity:0.8;">
+                        @(reply.IsAiReply ? "AI" : "You")
+                    </MudText>
+                    <MudText Typo="Typo.body2">@reply.Content</MudText>
+                </div>
+            }
+        </div>
+    }
+
+    @if (_waitingForAi)
+    {
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mt-1">
+            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Secondary" />
+            <MudText Typo="Typo.caption" Style="opacity:0.6;">AI is thinking...</MudText>
+        </MudStack>
+    }
+    <MudDivider Class="my-2" />
+    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+        <MudTextField @bind-Value="_replyText"
+                      Placeholder="Reply..."
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      Lines="1"
+                      FullWidth="true"
+                      Disabled="Running" />
+        <MudIconButton Icon="@Icons.Material.Filled.Send"
+                       Color="Color.Primary"
+                       Size="Size.Small"
+                       Disabled="@(Running || string.IsNullOrWhiteSpace(_replyText))"
+                       OnClick="SendReplyAsync" />
+    </MudStack>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public long SubmissionId { get; set; }
+    [Parameter, EditorRequired] public long ReviewId { get; set; }
+    [Parameter, EditorRequired] public ReviewCommentResponse CommentData { get; set; } = null!;
+    [Parameter] public EventCallback OnZoneResize { get; set; }
+
+    private List<ThreadReplyResponse> _replies = [];
+    private string _replyText = string.Empty;
+    private long? _threadId; // captured from POST response once a thread is created
+    private bool _waitingForAi;
+    private CancellationTokenSource? _aiPollCts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (CommentData.ThreadId is not { } threadId) return;
+
+        _threadId = threadId;
+        await RunLogException(async () => await LoadRepliesAsync(threadId));
+    }
+
+    private async Task LoadRepliesAsync(long threadId)
+    {
+        var result = await ReviewService.GetRepliesAsync(threadId);
+        if (result.IsSuccess)
+        {
+            _replies = result.Data ?? [];
+            await OnZoneResize.InvokeAsync();
+        }
+        else
+        {
+            Snackbar.Add(result.Error ?? $"Failed to load replies ({result.StatusCode}).", Severity.Error);
+        }
+    }
+
+    private async Task SendReplyAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_replyText)) return;
+
+        var text = _replyText;
+        _replyText = string.Empty;
+
+        await RunLogException(async () =>
+        {
+            var result = await ReviewService.PostReplyAsync(SubmissionId, ReviewId, CommentData.LineNumber, text);
+            if (!result.IsSuccess)
+            {
+                _replyText = text;
+                Snackbar.Add(result.Error ?? $"Failed to send reply ({result.StatusCode}).", Severity.Error);
+                return;
+            }
+
+            // Capture threadId from the response so subsequent replies reload from server.
+            if (result.Data is { } created)
+                _threadId = created.ThreadId;
+
+            if (_threadId is { } threadId)
+            {
+                await LoadRepliesAsync(threadId);
+                StartAiReplyPolling(threadId);
+            }
+            else
+            {
+                _replies.Add(new ThreadReplyResponse(0, text, false, DateTime.UtcNow));
+                await OnZoneResize.InvokeAsync();
+            }
+        });
+    }
+
+    private void StartAiReplyPolling(long threadId)
+    {
+        _aiPollCts?.Cancel();
+        _aiPollCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var ct = _aiPollCts.Token;
+        var countAfterUserReply = _replies.Count;
+
+        _waitingForAi = true;
+
+        _ = Task.Run(async () =>
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                await Task.Delay(2000, ct).ContinueWith(_ => { });
+                if (ct.IsCancellationRequested) break;
+
+                var result = await ReviewService.GetRepliesAsync(threadId);
+                if (result.IsSuccess && result.Data is not null && result.Data.Count > countAfterUserReply)
+                {
+                    await InvokeAsync(async () =>
+                    {
+                        _replies = result.Data;
+                        _waitingForAi = false;
+                        StateHasChanged();
+                        await OnZoneResize.InvokeAsync();
+                    });
+                    break;
+                }
+            }
+
+            await InvokeAsync(() => { _waitingForAi = false; StateHasChanged(); });
+        }, ct);
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _aiPollCts?.Cancel();
+        _aiPollCts?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

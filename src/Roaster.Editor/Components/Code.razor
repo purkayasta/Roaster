@@ -1,39 +1,85 @@
 @inherits EditorComponentBase
 @inject IJSRuntime JS
+@inject SubmissionService SubmissionService
+@inject ReviewService ReviewService
+@implements IAsyncDisposable
 
 <MudStack Spacing="0" Style="height: 100%;">
-    <MudPaper Elevation="1" Class="px-3 py-2" Style="background:#2d2d2d; border-radius:0;">
+    <MudPaper Elevation="1" Class="px-3 py-2" Style="border-radius:0;">
         <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-            <MudSelect T="string" Value="_language" ValueChanged="OnLanguageChangedAsync"
-                       Dense="true" Variant="Variant.Outlined" Margin="Margin.Dense"
-                       Style="max-width:160px; background:#3c3c3c;" Label="Language">
+            <MudSelect T="string" @bind-Value="_language" @bind-Value:after="() => OnLanguageChangedAsync(_language)"
+                       Dense="true" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:160px;" Label="Language">
                 @foreach (var lang in CodeUtils.Languages)
                 {
                     <MudSelectItem Value="@lang">@lang</MudSelectItem>
                 }
             </MudSelect>
-            <MudSelect T="string" Value="_theme" ValueChanged="OnThemeChangedAsync"
-                       Dense="true" Variant="Variant.Outlined" Margin="Margin.Dense"
-                       Style="max-width:150px; background:#3c3c3c;" Label="Theme">
+            <MudSelect T="string" @bind-Value="_theme" @bind-Value:after="() => OnThemeChangedAsync(_theme)"
+                       Dense="true" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:150px;" Label="Theme">
                 @foreach (var (key, label) in CodeUtils.Themes)
                 {
                     <MudSelectItem Value="@key">@label</MudSelectItem>
                 }
             </MudSelect>
+            <MudSpacer />
+            @if (_review is not null)
+            {
+                <MudTooltip Text="@_review.Summary">
+                    <MudChip T="string" Color="Color.Success" Variant="Variant.Outlined" Size="Size.Small">
+                        @_review.Comments.Count comment@(_review.Comments.Count == 1 ? "" : "s")
+                    </MudChip>
+                </MudTooltip>
+            }
+            @if (_polling)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" />
+            }
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.RateReview"
+                       OnClick="SubmitForReviewAsync" Disabled="Running || _polling">
+                Review
+            </MudButton>
         </MudStack>
     </MudPaper>
-    <div style="height: calc(100vh - 180px);">
-        <StandaloneCodeEditor @ref="_editor" Id="code-editor-main" ConstructionOptions="BuildOptions" />
+
+    <div style="position:relative; height: calc(100vh - 180px);">
+        <StandaloneCodeEditor @ref="_editor" Id="@CodeUtils.EditorId" ConstructionOptions="BuildOptions" />
     </div>
 </MudStack>
 
+@* Off-screen containers — Blazor renders these; JS hands them to Monaco as ViewZone DOM nodes *@
+@if (_review is not null)
+{
+    <div style="position:absolute; left:-9999px; width:800px; visibility:hidden; pointer-events:none;">
+        @foreach (var comment in _review.Comments)
+        {
+            <div @ref="_commentRefs[comment.LineNumber]" style="pointer-events:auto;">
+                <Comment SubmissionId="_submissionId!.Value" ReviewId="_review.Id" CommentData="comment"
+                         OnZoneResize="() => ResizeZoneAsync(comment.LineNumber)" />
+            </div>
+        }
+    </div>
+}
+
 @code {
+    [Parameter] public Guid SessionId { get; set; }
+    [Parameter] public long? SubmissionId { get; set; }
     [Parameter] public string? Content { get; set; }
     [Parameter] public string? Language { get; set; }
 
     private StandaloneCodeEditor _editor = null!;
     private string _language = CodeUtils.DefaultLanguage;
-    private string _theme    = CodeUtils.DefaultTheme;
+    private string _theme = CodeUtils.DefaultTheme;
+
+    private long? _submissionId;
+    private ReviewResponse? _review;
+    private bool _reviewDirty;
+    private bool _polling;
+
+    private readonly Dictionary<int, ElementReference> _commentRefs = new();
+    private readonly Dictionary<int, string> _zoneIds = new();
+    private string[] _decorationIds = [];
+
+    private CancellationTokenSource? _pollingCts;
 
     protected override async Task OnInitializedAsync()
     {
@@ -41,30 +87,163 @@
             _language = Language;
 
         await RunLogException(async () => await ThemeFactory.EnsureAllAsync(JS));
+
+        if (SubmissionId is { } id)
+        {
+            _submissionId = id;
+            await TryLoadReviewAsync(id);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_reviewDirty || _review is null) return;
+        _reviewDirty = false;
+
+        await RunLogException(async () =>
+        {
+            await ClearZonesAndDecorationsAsync();
+
+            foreach (var comment in _review.Comments)
+            {
+                if (!_commentRefs.TryGetValue(comment.LineNumber, out var domRef)) continue;
+
+                var zoneId = await CodeUtils.AddReviewZoneAsync(JS, comment.LineNumber, domRef);
+                if (zoneId is not null)
+                    _zoneIds[comment.LineNumber] = zoneId;
+            }
+
+            _decorationIds = await CodeUtils.AddReviewDecorationsAsync(JS, _review.Comments);
+        });
     }
 
     private StandaloneEditorConstructionOptions BuildOptions(StandaloneCodeEditor _) => new()
     {
-        AutomaticLayout      = true,
-        Language             = _language,
-        Value                = string.IsNullOrWhiteSpace(Content) ? CodeUtils.DefaultBoilerplate : Content,
-        Theme                = _theme,
-        WordWrap             = "on",
+        AutomaticLayout = true,
+        Language = _language,
+        Value = string.IsNullOrWhiteSpace(Content) ? CodeUtils.DefaultBoilerplate : Content,
+        Theme = _theme,
+        WordWrap = "on",
         ScrollBeyondLastLine = false,
-        Minimap              = new EditorMinimapOptions { Enabled = false },
-        LineNumbers          = "on",
-        FontSize             = 14,
+        Minimap = new EditorMinimapOptions { Enabled = false },
+        LineNumbers = "on",
+        FontSize = 14,
+        GlyphMargin = true,
     };
 
-    private async Task OnLanguageChangedAsync(string language)
-    {
-        _language = language;
+    private async Task OnLanguageChangedAsync(string language) =>
         await CodeUtils.SetLanguageAsync(JS, _editor, language);
+
+    private async Task OnThemeChangedAsync(string theme) =>
+        await CodeUtils.SetThemeAsync(JS, theme);
+
+    private async Task SubmitForReviewAsync()
+    {
+        await RunLogException(async () =>
+        {
+            var code = await _editor.GetValue();
+            var result = await SubmissionService.SubmitAsync(SessionId, code, _language);
+            if (!result.IsSuccess)
+            {
+                Snackbar.Add(result.Error ?? $"Request failed ({result.StatusCode}).", Severity.Error);
+                return;
+            }
+
+            _submissionId = result.Data!.Id;
+            _review = null;
+            _commentRefs.Clear();
+            await ClearZonesAndDecorationsAsync();
+            StateHasChanged();
+            Snackbar.Add("Submitted for review!", Severity.Success);
+            StartPolling(_submissionId.Value);
+        });
     }
 
-    private async Task OnThemeChangedAsync(string theme)
+    private async Task TryLoadReviewAsync(long submissionId)
     {
-        _theme = theme;
-        await CodeUtils.SetThemeAsync(JS, theme);
+        await RunLogException(async () =>
+        {
+            var result = await ReviewService.GetReviewAsync(submissionId);
+            if (result.StatusCode == 200 && result.Data is not null)
+                ApplyReview(result.Data);
+        });
+    }
+
+    private void StartPolling(long submissionId)
+    {
+        _pollingCts?.Cancel();
+        _pollingCts = new CancellationTokenSource();
+        var ct = _pollingCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            await InvokeAsync(() => { _polling = true; StateHasChanged(); });
+
+            while (!ct.IsCancellationRequested)
+            {
+                await Task.Delay(3000, ct).ContinueWith(_ => { }); // swallow cancellation
+                if (ct.IsCancellationRequested) break;
+
+                var result = await ReviewService.GetReviewAsync(submissionId, ct);
+
+                if (result.StatusCode == 200 && result.Data is not null)
+                {
+                    await InvokeAsync(() => { _polling = false; ApplyReview(result.Data); StateHasChanged(); });
+                    break;
+                }
+
+                if (!result.IsSuccess && result.StatusCode != 204)
+                {
+                    await InvokeAsync(() =>
+                    {
+                        _polling = false;
+                        Snackbar.Add(result.Error ?? "Review polling failed.", Severity.Error);
+                        StateHasChanged();
+                    });
+                    break;
+                }
+            }
+
+            await InvokeAsync(() => { _polling = false; StateHasChanged(); });
+        }, ct);
+    }
+
+    private void ApplyReview(ReviewResponse review)
+    {
+        _commentRefs.Clear();
+        foreach (var c in review.Comments)
+            _commentRefs[c.LineNumber] = default;
+
+        _review = review;
+        _reviewDirty = true;
+    }
+
+    private async Task ResizeZoneAsync(int lineNumber)
+    {
+        if (!_zoneIds.TryGetValue(lineNumber, out var zoneId)) return;
+        if (!_commentRefs.TryGetValue(lineNumber, out var domRef)) return;
+
+        await RunLogException(async () => await CodeUtils.UpdateZoneHeightAsync(JS, zoneId, domRef));
+    }
+
+    private async Task ClearZonesAndDecorationsAsync()
+    {
+        if (_zoneIds.Count > 0)
+        {
+            await CodeUtils.RemoveZonesAsync(JS, _zoneIds.Values);
+            _zoneIds.Clear();
+        }
+        if (_decorationIds.Length > 0)
+        {
+            await CodeUtils.ClearDecorationsAsync(JS, _decorationIds);
+            _decorationIds = [];
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _pollingCts?.Cancel();
+        _pollingCts?.Dispose();
+        await ClearZonesAndDecorationsAsync();
     }
 }

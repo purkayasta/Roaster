@@ -34,7 +34,11 @@
     {
         await RunLogException(async () =>
         {
-            _sessions = await SessionService.GetAllAsync(pageSize: 50);
+            var result = await SessionService.GetAllAsync(pageSize: 50);
+            if (result.IsSuccess)
+                _sessions = result.Data ?? [];
+            else
+                Snackbar.Add(result.Error ?? $"Failed to load sessions ({result.StatusCode}).", Severity.Error);
         });
     }
 
@@ -46,8 +50,11 @@
         {
             await RunLogException(async () =>
             {
-                var session = await SessionService.CreateAsync(name);
-                Navigation.NavigateTo($"/session/{session.Id}");
+                var response = await SessionService.CreateAsync(name);
+                if (response.IsSuccess)
+                    Navigation.NavigateTo($"/session/{response.Data!.Id}");
+                else
+                    Snackbar.Add(response.Error ?? $"Failed to create session ({response.StatusCode}).", Severity.Error);
             });
         }
     }
@@ -59,8 +66,11 @@
     {
         await RunLogException(async () =>
         {
-            await SessionService.DeleteAsync(sessionId);
-            _sessions.RemoveAll(s => s.SessionId == sessionId);
+            var result = await SessionService.DeleteAsync(sessionId);
+            if (result.IsSuccess)
+                _sessions.RemoveAll(s => s.SessionId == sessionId);
+            else
+                Snackbar.Add(result.Error ?? $"Failed to delete session ({result.StatusCode}).", Severity.Error);
         });
     }
 }

@@ -31,7 +31,8 @@
             }
         </MudStack>
 
-        <Code Content="@_session.CodeContent" Language="@_session.Language" />
+        <Code SessionId="@_session.Id" SubmissionId="@_session.SubmissionId"
+              Content="@_session.CodeContent" Language="@_session.Language" />
     }
 </MudContainer>
 
@@ -46,7 +47,11 @@
 
         await RunLogException(async () =>
         {
-            _session = await SessionService.GetByIdAsync(sessionId);
+            var result = await SessionService.GetByIdAsync(sessionId);
+            if (result.IsSuccess)
+                _session = result.Data;
+            else
+                Snackbar.Add(result.Error ?? $"Failed to load session ({result.StatusCode}).", Severity.Error);
         });
     }
 

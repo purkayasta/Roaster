@@ -79,7 +79,8 @@ public static class SessionEndpoints
                 session.CreatedAt,
                 session.Submission?.Payload.Content,
                 session.Submission?.Payload.Language,
-                session.Submission?.Status.ToString()));
+                session.Submission?.Status.ToString(),
+                session.Submission?.Id));
         }).WithName("GetSession");
 
         app.MapDelete("/api/sessions/{id:guid}", async (Guid id, RoasterDbContext db,

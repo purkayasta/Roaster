@@ -1,15 +1,13 @@
+@page "/code"
 @inherits EditorComponentBase
 @inject SessionService SessionService
 
-@if (Running)
-{
-    <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height: 60vh;">
-        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
-    </MudStack>
-}
-else
-{
-    <MudDataGrid T="SessionSubmissionResponse" Items="_submissions" Filterable="false" SortMode="SortMode.None" Groupable="false"
+<PageTitle>Submissions</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False" Class="pa-4">
+    <MudText Typo="Typo.h5" Class="mb-4">Submissions</MudText>
+
+    <MudDataGrid T="SessionSubmissionResponse" ServerData="LoadServerDataAsync" Filterable="false" SortMode="SortMode.None" Groupable="false"
                  Hover="true" Striped="true">
         <Columns>
             <PropertyColumn Property="x => x.SessionName" Title="Session" />
@@ -24,16 +22,29 @@ else
             <MudDataGridPager T="SessionSubmissionResponse" />
         </PagerContent>
     </MudDataGrid>
-}
+</MudContainer>
 
 @code {
-    private List<SessionSubmissionResponse> _submissions = [];
-
-    protected override async Task OnInitializedAsync()
+    private async Task<GridData<SessionSubmissionResponse>> LoadServerDataAsync(GridState<SessionSubmissionResponse> state, CancellationToken ct)
     {
-        await RunLogException(async () =>
+        var page     = state.Page + 1; // MudDataGrid is 0-based
+        var pageSize = state.PageSize;
+
+        var result = await SessionService.GetAllAsync(page, pageSize + 1, ct);
+        if (!result.IsSuccess)
         {
-            _submissions = await SessionService.GetAllAsync();
-        });
+            Snackbar.Add(result.Error ?? $"Failed to load submissions ({result.StatusCode}).", Severity.Error);
+            return new GridData<SessionSubmissionResponse> { Items = [], TotalItems = 0 };
+        }
+
+        var items   = result.Data ?? [];
+        var hasMore = items.Count > pageSize;
+        if (hasMore) items = items.Take(pageSize).ToList();
+
+        return new GridData<SessionSubmissionResponse>
+        {
+            Items      = items,
+            TotalItems = (page - 1) * pageSize + items.Count + (hasMore ? 1 : 0)
+        };
     }
 }

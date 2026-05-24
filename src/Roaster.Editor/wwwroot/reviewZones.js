@@ -12,7 +12,7 @@ window.RoasterReview = {
             afterLineNumber: lineNumber,
             domNode: domNode,
             heightInPx: domNode.scrollHeight || 120,
-            suppressMouseFromEvent: true
+            suppressMouseFromEvent: (e) => !e.target.element.closest('input, textarea, button, [role="button"]')
         };
 
         let zoneId = null;

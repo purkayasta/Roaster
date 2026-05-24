@@ -50,6 +50,7 @@ public class CodeSubmittedConsumer(
             db.SubmissionEvents.Add(new SubmissionEvent
             {
                 SubmissionId  = submission.Id,
+                SessionId     = submission.SessionId,
                 EventType     = SubmissionEventType.ProcessingStarted,
                 CorrelationId = msg.CorrelationId,
                 OccurredAt    = processingStartedAt
@@ -105,6 +106,7 @@ public class CodeSubmittedConsumer(
                 db.SubmissionEvents.Add(new SubmissionEvent
                 {
                     SubmissionId  = submission.Id,
+                    SessionId     = submission.SessionId,
                     EventType     = SubmissionEventType.ReviewCompleted,
                     CorrelationId = msg.CorrelationId,
                     OccurredAt    = DateTime.UtcNow
@@ -126,6 +128,7 @@ public class CodeSubmittedConsumer(
                 db.SubmissionEvents.Add(new SubmissionEvent
                 {
                     SubmissionId  = submission.Id,
+                    SessionId     = submission.SessionId,
                     EventType     = SubmissionEventType.Failed,
                     CorrelationId = msg.CorrelationId,
                     Metadata      = JsonSerializer.Serialize(new { error = ex.Message }),

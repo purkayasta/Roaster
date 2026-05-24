@@ -73,6 +73,7 @@ public static class SubmissionEndpoints
             db.SubmissionEvents.Add(new SubmissionEvent
             {
                 SubmissionId  = submission.Id,
+                SessionId     = req.SessionId,
                 EventType     = SubmissionEventType.Submitted,
                 CorrelationId = correlationId,
                 OccurredAt    = DateTime.UtcNow

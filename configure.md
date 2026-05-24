@@ -33,10 +33,10 @@ Run this in a dedicated terminal and leave it open, or run it in the background:
 ollama serve &> /tmp/ollama.log &
 ```
 
-### Pull the model (one-time, ~4.7 GB)
+### Pull the model (one-time, ~2.5 GB)
 
 ```bash
-ollama pull qwen2.5-coder:7b
+ollama pull phi4-mini
 ```
 
 Verify the model is available:
@@ -45,7 +45,7 @@ Verify the model is available:
 ollama list
 ```
 
-You should see `qwen2.5-coder:7b` in the output.
+You should see `phi4-mini` in the output.
 
 ### Stop Ollama
 
@@ -81,10 +81,11 @@ If you skip this step the defaults are used:
 From the repo root:
 
 ```bash
-docker compose up --build
+make up        # detached (default)
+make up a=1    # attached — streams logs to the terminal
 ```
 
-To run in the background:
+Or directly with Docker Compose:
 
 ```bash
 docker compose up --build -d
@@ -141,7 +142,8 @@ docker compose logs -f roaster-frontend
 docker compose up --build roaster-api -d
 
 # Stop all services (data is preserved)
-docker compose down
+make down
+# or: docker compose down
 
 # Stop all services and delete all data (wipes the Postgres volume)
 docker compose down -v
@@ -168,7 +170,7 @@ All configuration is passed to containers via environment variables in `docker-c
 | `ConnectionStrings__Postgres` | *(set in compose)* | PostgreSQL connection string |
 | `RabbitMQ__Uri` | *(set in compose)* | RabbitMQ URI |
 | `Ollama__Endpoint` | `http://host.docker.internal:11434` | Ollama server URL |
-| `Ollama__ModelId` | `qwen2.5-coder:7b` | Model to use for code review |
+| `Ollama__ModelId` | `phi4-mini:latest` | Model to use for code review |
 
 ### Frontend
 
@@ -195,20 +197,26 @@ Change this before building if your API is on a different host or port.
 To use a different model, pull it first:
 
 ```bash
-ollama pull qwen2.5-coder:3b
+ollama pull phi4-mini
 ```
 
-Then update `Ollama__ModelId` in `docker-compose.yml` and restart the consumer:
+Then pass the model name via env var (no file edit needed):
 
 ```bash
-docker compose up --build roaster-consumer -d
+OLLAMA_MODEL=phi4-mini:latest make up
+```
+
+Or set it permanently in a `.env` file at the repo root:
+
+```bash
+OLLAMA_MODEL=phi4-mini:latest
 ```
 
 Recommended models for Apple Silicon:
 
 | Model | Size | Notes |
 |---|---|---|
-| `qwen2.5-coder:7b` | ~4.7 GB | Default — best quality/speed balance |
-| `qwen2.5-coder:3b` | ~2.0 GB | Faster, good for M1 with 8 GB RAM |
-| `codellama:7b` | ~3.8 GB | Meta's code model, well-tested |
-| `deepseek-coder-v2:16b` | ~9.1 GB | Higher quality, needs M2 Pro / 16 GB+ |
+| `phi4-mini:latest` | ~2.5 GB | Default — fast, low memory |
+| `qwen2.5-coder:7b` | ~4.7 GB | Better quality, needs 8 GB+ RAM |
+| `qwen2.5-coder:3b` | ~2.0 GB | Good balance for M1 8 GB |
+| `deepseek-coder-v2:16b` | ~9.1 GB | Highest quality, needs M2 Pro / 16 GB+ |

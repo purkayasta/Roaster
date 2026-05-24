@@ -52,6 +52,7 @@ app.MapSessionEndpoints();
 app.MapSubmissionEndpoints();
 app.MapReviewEndpoints();
 app.MapThreadEndpoints();
+app.MapEventEndpoints();
 app.MapHealthChecks("/health");
 
 await app.RunAsync();

@@ -68,6 +68,7 @@ public class UserThreadReplyConsumer(
             db.SubmissionEvents.Add(new SubmissionEvent
             {
                 SubmissionId  = msg.SubmissionId,
+                SessionId     = thread.Review.Submission.SessionId,
                 EventType     = SubmissionEventType.AiReplied,
                 CorrelationId = msg.CorrelationId,
                 OccurredAt    = DateTime.UtcNow

@@ -28,20 +28,35 @@ Source in `src/`, tests in `tests/`.
 dotnet build
 dotnet test
 
-# Run backend services
-dotnet run --project src/Roaster.Api
-dotnet run --project src/Roaster.Consumer
-
 # Run migrations
 dotnet run --project src/Roaster.Migration -- "Host=localhost;Database=roaster;Username=postgres;Password=postgres"
 
 # Run frontend (from src/Roaster.Editor)
 dotnet run
 dotnet watch run   # hot reload
-
-# Full stack via Docker
-docker-compose up --build
 ```
+
+## Make Targets
+
+`make up` is **detached by default**. Pass `a=1` to attach and see logs.
+
+```bash
+# Local dev (no Docker — requires infra running)
+make api            # dotnet watch run for Roaster.Api
+make consumer       # dotnet watch run for Roaster.Consumer
+make editor         # dotnet watch run for Roaster.Editor
+
+# Docker — full stack (single docker-compose.yml)
+make up             # start everything
+make up a=1         # start and attach to logs
+make down           # tear down
+```
+
+**Typical dev workflow:**
+1. `make up` — start full stack in Docker (DB + RabbitMQ + migration + API + consumer + frontend)
+2. Or for local hot-reload: `make api` + `make consumer` + `make editor` (requires Docker infra already running)
+
+All Docker images use alpine variants for minimal size. Ollama model is configured via `OLLAMA_MODEL` env var (default: `phi4-mini:latest`).
 
 ---
 
@@ -51,7 +66,7 @@ docker-compose up --build
 
 **Thread replies:** User posts to `/api/submissions/{subId}/reviews/{revId}/lines/{lineNum}/threads` → `UserThreadReplyConsumer` builds chat history → AI reply saved → `GET /api/threads/{threadId}/replies` returns conversation.
 
-**Key tech:** ASP.NET Core 10 (Minimal APIs) · EF Core 10 + Npgsql (Postgres 17-alpine) · MassTransit 8 + RabbitMQ · Semantic Kernel 1.74.0 + Ollama (`qwen2.5-coder:7b`) · Blazor WASM 10 · MudBlazor 9.4 · BlazorMonaco 3.4 · DbUp 7.
+**Key tech:** ASP.NET Core 10 (Minimal APIs) · EF Core 10 + Npgsql (Postgres 17-alpine) · MassTransit 8 + RabbitMQ · Semantic Kernel 1.74.0 + Ollama (`phi4-mini:latest`) · Blazor WASM 10 · MudBlazor 9.4 · BlazorMonaco 3.4 · DbUp 7.
 
 **JSONB columns:** `Submission.Payload` (code + language), `Review.Comments` (line comments array), `SubmissionEvent.Metadata`.
 

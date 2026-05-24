@@ -65,10 +65,10 @@ The short version:
 ```bash
 # 1. Start Ollama natively (runs outside Docker on Mac)
 ollama serve
-ollama pull qwen2.5-coder:7b
+ollama pull phi4-mini
 
 # 2. Build and start everything
-docker compose up --build
+make up
 ```
 
 Then open http://localhost:5094.

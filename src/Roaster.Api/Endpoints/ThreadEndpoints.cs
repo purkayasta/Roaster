@@ -68,6 +68,7 @@ public static class ThreadEndpoints
                 db.SubmissionEvents.Add(new SubmissionEvent
                 {
                     SubmissionId  = submissionId,
+                    SessionId     = correlationId,
                     EventType     = SubmissionEventType.UserReplied,
                     CorrelationId = correlationId,
                     OccurredAt    = DateTime.UtcNow

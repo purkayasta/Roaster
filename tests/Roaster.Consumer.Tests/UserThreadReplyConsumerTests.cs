@@ -116,7 +116,7 @@ public class UserThreadReplyConsumerTests : IDisposable
         var ctx = FakeConsumeContext.For(new UserThreadReplyEvent(thread.Id, sub.Id, 5, Guid.NewGuid(), DateTime.UtcNow));
         await _consumer.Consume(ctx);
 
-        _db.SubmissionEvents.Should().Contain(e => e.EventType == SubmissionEventType.AiReplied);
+        _db.Events.Should().Contain(e => e.EventType == EventType.AiReplied);
     }
 
     [Fact]

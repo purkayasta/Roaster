@@ -12,6 +12,6 @@ public sealed class Submission
     public Session Session { get; set; } = null!;
     public Review? Review { get; set; }
     public ReviewMetrics? Metrics { get; set; }
-    public ICollection<SubmissionEvent> Events { get; set; } = [];
+    public ICollection<Event> Events { get; set; } = [];
     public ICollection<SubmissionHistory> History { get; set; } = [];
 }

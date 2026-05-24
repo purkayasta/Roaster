@@ -38,11 +38,11 @@ public class EfConfigurationTests
     }
 
     [Fact]
-    public void SubmissionEvent_Metadata_IsNullable()
+    public void Event_Metadata_IsNullable()
     {
         using var db = BuildDb();
-        var entityType = db.Model.FindEntityType(typeof(SubmissionEvent))!;
-        var prop = entityType.FindProperty(nameof(SubmissionEvent.Metadata))!;
+        var entityType = db.Model.FindEntityType(typeof(Event))!;
+        var prop = entityType.FindProperty(nameof(Event.Metadata))!;
 
         prop.IsNullable.Should().BeTrue();
     }

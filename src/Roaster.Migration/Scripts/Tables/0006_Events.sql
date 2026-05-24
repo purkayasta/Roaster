@@ -1,4 +1,4 @@
-CREATE TABLE "SubmissionEvents" (
+CREATE TABLE "Events" (
     "Id"            bigserial    PRIMARY KEY,
     "SubmissionId"  bigint       NOT NULL REFERENCES "Submissions"("Id") ON DELETE CASCADE,
     "EventType"     smallint     NOT NULL,

@@ -4,9 +4,9 @@ using Roaster.Data.Models;
 
 namespace Roaster.Data.Configurations;
 
-public class SubmissionEventConfiguration : IEntityTypeConfiguration<SubmissionEvent>
+public class EventConfiguration : IEntityTypeConfiguration<Event>
 {
-    public void Configure(EntityTypeBuilder<SubmissionEvent> builder)
+    public void Configure(EntityTypeBuilder<Event> builder)
     {
         builder.HasKey(e => e.Id);
         builder.Property(e => e.Id).UseIdentityByDefaultColumn();
@@ -14,6 +14,6 @@ public class SubmissionEventConfiguration : IEntityTypeConfiguration<SubmissionE
         builder.Property(e => e.CorrelationId).IsRequired();
         builder.Property(e => e.Metadata).HasColumnType("jsonb");
         builder.Property(e => e.OccurredAt).IsRequired();
-        builder.ToTable("SubmissionEvents");
+        builder.ToTable("Events");
     }
 }

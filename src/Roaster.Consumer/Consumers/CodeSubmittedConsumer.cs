@@ -47,11 +47,11 @@ public class CodeSubmittedConsumer(
 
             var processingStartedAt = DateTime.UtcNow;
 
-            db.SubmissionEvents.Add(new SubmissionEvent
+            db.Events.Add(new Event
             {
                 SubmissionId  = submission.Id,
                 SessionId     = submission.SessionId,
-                EventType     = SubmissionEventType.ProcessingStarted,
+                EventType     = EventType.ProcessingStarted,
                 CorrelationId = msg.CorrelationId,
                 OccurredAt    = processingStartedAt
             });
@@ -103,11 +103,11 @@ public class CodeSubmittedConsumer(
                     CreatedAt        = DateTime.UtcNow
                 });
 
-                db.SubmissionEvents.Add(new SubmissionEvent
+                db.Events.Add(new Event
                 {
                     SubmissionId  = submission.Id,
                     SessionId     = submission.SessionId,
-                    EventType     = SubmissionEventType.ReviewCompleted,
+                    EventType     = EventType.ReviewCompleted,
                     CorrelationId = msg.CorrelationId,
                     OccurredAt    = DateTime.UtcNow
                 });
@@ -125,11 +125,11 @@ public class CodeSubmittedConsumer(
             {
                 logger.LogError(ex, "Review failed for submission {Id}", msg.SubmissionId);
                 submission.Status = SubmissionStatus.Failed;
-                db.SubmissionEvents.Add(new SubmissionEvent
+                db.Events.Add(new Event
                 {
                     SubmissionId  = submission.Id,
                     SessionId     = submission.SessionId,
-                    EventType     = SubmissionEventType.Failed,
+                    EventType     = EventType.Failed,
                     CorrelationId = msg.CorrelationId,
                     Metadata      = JsonSerializer.Serialize(new { error = ex.Message }),
                     OccurredAt    = DateTime.UtcNow

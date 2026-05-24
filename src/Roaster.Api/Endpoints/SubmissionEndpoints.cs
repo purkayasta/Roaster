@@ -70,11 +70,11 @@ public static class SubmissionEndpoints
                 logger.LogInformation("Submission {Id} updated for session {SessionId}", submission.Id, req.SessionId);
             }
 
-            db.SubmissionEvents.Add(new SubmissionEvent
+            db.Events.Add(new Event
             {
                 SubmissionId  = submission.Id,
                 SessionId     = req.SessionId,
-                EventType     = SubmissionEventType.Submitted,
+                EventType     = EventType.Submitted,
                 CorrelationId = correlationId,
                 OccurredAt    = DateTime.UtcNow
             });

@@ -2,55 +2,66 @@
 @inject ReviewService ReviewService
 @implements IAsyncDisposable
 
-<div class="roaster-review-comment">
-    <div class="roaster-review-header">
-        <MudChip T="string" Size="Size.Small" Color="CodeUtils.GetSeverityColor(CommentData.Severity)"
-                 Variant="Variant.Filled" Class="roaster-severity-chip">
-            @CommentData.Severity
-        </MudChip>
-        <MudText Typo="Typo.caption" Class="ml-2" Style="opacity:0.7;">Line @CommentData.LineNumber</MudText>
-    </div>
+<div class="roaster-review-comment" style="max-width:580px;">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="0" Style="padding:4px 6px;">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+            <MudChip T="string" Size="Size.Small" Color="CodeUtils.GetSeverityColor(CommentData.Severity)"
+                     Variant="Variant.Filled" Class="roaster-severity-chip">
+                @CommentData.Severity
+            </MudChip>
+            <MudText Typo="Typo.caption" Style="opacity:0.7;">Line @CommentData.LineNumber</MudText>
+        </MudStack>
+        <MudIconButton Icon="@(_collapsed ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ExpandLess)"
+                       Size="Size.Small" Style="padding:2px;" OnClick="ToggleCollapse" />
+    </MudStack>
 
-    <MudText Typo="Typo.body2" Class="roaster-comment-text">@CommentData.Comment</MudText>
-
-    @if (_replies.Count > 0)
+    @if (!_collapsed)
     {
-        <MudDivider Class="my-2" />
-        <div class="roaster-replies">
-            @foreach (var reply in _replies)
+        <MudDivider />
+        <div style="padding:6px 8px;">
+            <MudText Typo="Typo.body2" Class="roaster-comment-text">@CommentData.Comment</MudText>
+
+            @if (_replies.Count > 0)
             {
-                <div class="roaster-reply @(reply.IsAiReply ? "roaster-reply-ai" : "roaster-reply-user")">
-                    <MudText Typo="Typo.caption" Style="font-weight:600; opacity:0.8;">
-                        @(reply.IsAiReply ? "AI" : "You")
-                    </MudText>
-                    <MudText Typo="Typo.body2">@reply.Content</MudText>
+                <MudDivider Class="my-2" />
+                <div class="roaster-replies">
+                    @foreach (var reply in _replies)
+                    {
+                        <div class="roaster-reply @(reply.IsAiReply ? "roaster-reply-ai" : "roaster-reply-user")">
+                            <MudText Typo="Typo.caption" Style="font-weight:600; opacity:0.8;">
+                                @(reply.IsAiReply ? "AI" : "You")
+                            </MudText>
+                            <MudText Typo="Typo.body2">@reply.Content</MudText>
+                        </div>
+                    }
                 </div>
             }
+
+            @if (_waitingForAi)
+            {
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mt-1">
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Secondary" />
+                    <MudText Typo="Typo.caption" Style="opacity:0.6;">AI is thinking...</MudText>
+                </MudStack>
+            }
+
+            <MudDivider Class="my-2" />
+            <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                <MudTextField @bind-Value="_replyText"
+                              Placeholder="Reply..."
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Lines="1"
+                              FullWidth="true"
+                              Disabled="Running" />
+                <MudIconButton Icon="@Icons.Material.Filled.Send"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               Disabled="@(Running || string.IsNullOrWhiteSpace(_replyText))"
+                               OnClick="SendReplyAsync" />
+            </MudStack>
         </div>
     }
-
-    @if (_waitingForAi)
-    {
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mt-1">
-            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Secondary" />
-            <MudText Typo="Typo.caption" Style="opacity:0.6;">AI is thinking...</MudText>
-        </MudStack>
-    }
-    <MudDivider Class="my-2" />
-    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
-        <MudTextField @bind-Value="_replyText"
-                      Placeholder="Reply..."
-                      Variant="Variant.Outlined"
-                      Margin="Margin.Dense"
-                      Lines="1"
-                      FullWidth="true"
-                      Disabled="Running" />
-        <MudIconButton Icon="@Icons.Material.Filled.Send"
-                       Color="Color.Primary"
-                       Size="Size.Small"
-                       Disabled="@(Running || string.IsNullOrWhiteSpace(_replyText))"
-                       OnClick="SendReplyAsync" />
-    </MudStack>
 </div>
 
 @code {
@@ -61,9 +72,27 @@
 
     private List<ThreadReplyResponse> _replies = [];
     private string _replyText = string.Empty;
-    private long? _threadId; // captured from POST response once a thread is created
+    private long? _threadId;
     private bool _waitingForAi;
+    private bool _collapsed;
     private CancellationTokenSource? _aiPollCts;
+
+    private bool _pendingResize;
+
+    private void ToggleCollapse()
+    {
+        _collapsed = !_collapsed;
+        _pendingResize = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_pendingResize)
+        {
+            _pendingResize = false;
+            await OnZoneResize.InvokeAsync();
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {

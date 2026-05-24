@@ -13,7 +13,7 @@ public class RoasterDbContext : DbContext
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<CommentThread> CommentThreads => Set<CommentThread>();
     public DbSet<ThreadReply> ThreadReplies => Set<ThreadReply>();
-    public DbSet<SubmissionEvent> SubmissionEvents => Set<SubmissionEvent>();
+    public DbSet<Event> Events => Set<Event>();
     public DbSet<ReviewMetrics> ReviewMetrics => Set<ReviewMetrics>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

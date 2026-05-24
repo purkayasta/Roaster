@@ -68,7 +68,7 @@ All Docker images use alpine variants for minimal size. Ollama model is configur
 
 **Key tech:** ASP.NET Core 10 (Minimal APIs) · EF Core 10 + Npgsql (Postgres 17-alpine) · MassTransit 8 + RabbitMQ · Semantic Kernel 1.74.0 + Ollama (`phi4-mini:latest`) · Blazor WASM 10 · MudBlazor 9.4 · BlazorMonaco 3.4 · DbUp 7.
 
-**JSONB columns:** `Submission.Payload` (code + language), `Review.Comments` (line comments array), `SubmissionEvent.Metadata`.
+**JSONB columns:** `Submission.Payload` (code + language), `Review.Comments` (line comments array), `Event.Metadata`.
 
 **1:1 Session ↔ Submission.** Each session has at most one live submission. Resubmitting replaces the payload, deletes the existing review, and auto-captures the old payload in `SubmissionHistory`.
 

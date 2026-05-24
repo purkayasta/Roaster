@@ -41,24 +41,26 @@
         </MudStack>
     </MudPaper>
 
-    <div style="position:relative; height: calc(100vh - 180px);">
+    <div style="position:relative; flex:1; min-height:0;">
         <StandaloneCodeEditor @ref="_editor" Id="@CodeUtils.EditorId" ConstructionOptions="BuildOptions" />
-    </div>
-</MudStack>
 
-@* Off-screen containers — Blazor renders these; JS hands them to Monaco as ViewZone DOM nodes *@
-@if (_review is not null)
-{
-    <div style="position:absolute; left:-9999px; width:800px; visibility:hidden; pointer-events:none;">
-        @foreach (var comment in _review.Comments)
+        @if (_review is not null)
         {
-            <div @ref="_commentRefs[comment.LineNumber]" style="pointer-events:auto;">
-                <Comment SubmissionId="_submissionId!.Value" ReviewId="_review.Id" CommentData="comment"
-                         OnZoneResize="() => ResizeZoneAsync(comment.LineNumber)" />
+            <div id="roaster-comment-overlay"
+                 style="position:absolute; top:0; left:0; right:0; bottom:0; pointer-events:none; overflow:hidden; z-index:10; visibility:hidden;">
+                @foreach (var comment in _review.Comments)
+                {
+                    <div @ref="_commentRefs[comment.LineNumber]"
+                         data-line="@comment.LineNumber"
+                         style="position:absolute; left:0; right:0; pointer-events:auto;">
+                        <Comment SubmissionId="_submissionId!.Value" ReviewId="_review.Id" CommentData="comment"
+                                 OnZoneResize="() => ResizeZoneAsync(comment.LineNumber)" />
+                    </div>
+                }
             </div>
         }
     </div>
-}
+</MudStack>
 
 @code {
     [Parameter] public Guid SessionId { get; set; }
@@ -114,6 +116,7 @@
             }
 
             _decorationIds = await CodeUtils.AddReviewDecorationsAsync(JS, _review.Comments);
+            await CodeUtils.SyncOverlayAsync(JS);
         });
     }
 
@@ -223,7 +226,11 @@
         if (!_zoneIds.TryGetValue(lineNumber, out var zoneId)) return;
         if (!_commentRefs.TryGetValue(lineNumber, out var domRef)) return;
 
-        await RunLogException(async () => await CodeUtils.UpdateZoneHeightAsync(JS, zoneId, domRef));
+        await RunLogException(async () =>
+        {
+            await CodeUtils.UpdateZoneHeightAsync(JS, zoneId, domRef);
+            await CodeUtils.SyncOverlayAsync(JS);
+        });
     }
 
     private async Task ClearZonesAndDecorationsAsync()

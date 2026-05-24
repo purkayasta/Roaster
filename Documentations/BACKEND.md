@@ -44,7 +44,7 @@ POST /api/submissions
   → If no existing Submission for session → creates new (Status=Submitted)
   → If existing Submission with Status=Processing → 409 Conflict
   → If existing Submission (non-Processing) → updates Payload, resets Status=Submitted, removes old Review
-  → Logs SubmissionEvent(Submitted) with correlationId = session.Id
+  → Logs Event(Submitted) with correlationId = session.Id
   → Publishes CodeSubmittedEvent to RabbitMQ
   → Returns 202 Accepted
 
@@ -53,12 +53,12 @@ GET /api/submissions/{id}
 
 RabbitMQ: code-submitted queue (PrefetchCount=1, ConcurrentMessageLimit=1)
   → CodeSubmittedConsumer
-  → Status: Submitted → Processing; logs ProcessingStarted event
+  → Status: Submitted → Processing; logs Event(ProcessingStarted)
   → Calls IAiReviewService.ReviewCodeAsync()
-  → Saves Review (Summary + Comments JSONB) + ReviewMetrics + SubmissionEvent(ReviewCompleted)
+  → Saves Review (Summary + Comments JSONB) + ReviewMetrics + Event(ReviewCompleted)
   → Status: Processing → Completed
   → Publishes ReviewCompletedEvent
-  → On failure: Status → Failed, logs Failed event, rethrows (triggers MassTransit retry)
+  → On failure: Status → Failed, logs Event(Failed), rethrows (triggers MassTransit retry)
 
 GET /api/submissions/{id}/review
   → Returns 204 while Status ≠ Completed; 200 with ReviewDto when done
@@ -66,14 +66,14 @@ GET /api/submissions/{id}/review
 
 POST /api/submissions/{subId}/reviews/{revId}/lines/{lineNum}/threads
   → Creates CommentThread + ThreadReply (IsAiReply=false)
-  → Logs SubmissionEvent(UserReplied)
+  → Logs Event(UserReplied)
   → Publishes UserThreadReplyEvent
 
 RabbitMQ: user-thread-reply queue
   → UserThreadReplyConsumer builds full chat history from prior replies
   → Calls IAiReviewService.ReplyToThreadAsync()
   → Saves AI ThreadReply (IsAiReply=true)
-  → Logs SubmissionEvent(AiReplied)
+  → Logs Event(AiReplied)
 
 GET /api/threads/{threadId}/replies
   → Returns ordered conversation (user/AI alternating)
@@ -111,7 +111,7 @@ OpenAPI/Scalar UI: `/scalar/v1` (development only).
 | `Review` | bigserial | `SubmissionId FK`, `Summary text`, `Comments JSONB` | Created by consumer |
 | `CommentThread` | bigserial | `ReviewId FK`, `LineNumber int` | Unique (ReviewId, LineNumber) |
 | `ThreadReply` | bigserial | `ThreadId FK`, `Content text`, `IsAiReply bool` | User and AI messages |
-| `SubmissionEvent` | bigserial | `SubmissionId FK`, `EventType smallint`, `CorrelationId UUID`, `Metadata JSONB` | Audit log |
+| `Event` | bigserial | `SubmissionId FK`, `SessionId UUID`, `EventType smallint`, `CorrelationId UUID`, `Metadata JSONB` | Audit log |
 | `SubmissionHistory` | bigserial | `SubmissionId FK`, `SessionId FK`, `Payload JSONB`, `ChangedAt` | Auto-captured on payload change |
 | `ReviewMetrics` | bigserial | `SubmissionId FK`, `ModelId varchar(100)`, timing/count ints | Performance data |
 
@@ -123,7 +123,7 @@ OpenAPI/Scalar UI: `/scalar/v1` (development only).
 **ReviewSeverity** (stored as smallint):
 - 10 = Gentle, 20 = Medium, 30 = Brutal
 
-**SubmissionEventType** (stored as smallint):
+**EventType** (stored as smallint):
 - 10 = Submitted, 20 = ProcessingStarted, 30 = ReviewCompleted, 40 = Failed, 50 = UserReplied, 60 = AiReplied
 
 ---
@@ -133,7 +133,7 @@ OpenAPI/Scalar UI: `/scalar/v1` (development only).
 **JSONB owned types.**
 - `Submission.Payload` → `CodePayload { Content, Language }` — single JSONB column
 - `Review.Comments` → `List<ReviewLineComment>` — JSONB array
-- `SubmissionEvent.Metadata` — JSONB for arbitrary event context
+- `Event.Metadata` — JSONB for arbitrary event context
 
 **Session soft delete.** `Session.IsActive` defaults to `true`. `DELETE /api/sessions/{id}` sets it `false`. All `GET /api/sessions` queries filter `IsActive = true`.
 
@@ -143,7 +143,7 @@ OpenAPI/Scalar UI: `/scalar/v1` (development only).
 
 **SubmissionHistory auto-capture.** `RoasterDbContext.SaveChangesAsync` detects modified `Submission.Payload` and writes a `SubmissionHistory` row automatically, without callers needing to do it.
 
-**CorrelationId in SubmissionEvents = SessionId.** The `CorrelationId` stored in `SubmissionEvent` rows is the Session's UUID, not the HTTP-header UUID. The `CorrelationIdMiddleware` UUID only flows into Serilog context and the `X-Correlation-Id` response header.
+**CorrelationId in Events = SessionId.** The `CorrelationId` stored in `Event` rows is the Session's UUID, not the HTTP-header UUID. The `CorrelationIdMiddleware` UUID only flows into Serilog context and the `X-Correlation-Id` response header.
 
 **MassTransit retry config.**
 - `CodeSubmittedConsumer`: `Exponential(3, start=10 s, max=120 s, increment=10 s)`.
@@ -170,7 +170,7 @@ OpenAPI/Scalar UI: `/scalar/v1` (development only).
 {
   "ConnectionStrings": { "Postgres": "..." },
   "RabbitMQ": { "Uri": "..." },
-  "Ollama": { "Endpoint": "http://localhost:11434", "ModelId": "qwen2.5-coder:7b" }
+  "Ollama": { "Endpoint": "http://localhost:11434", "ModelId": "phi4-mini:latest" }
 }
 ```
 

@@ -15,7 +15,7 @@ public enum ReviewSeverity
     Brutal = 30
 }
 
-public enum SubmissionEventType
+public enum EventType
 {
     Submitted         = 10,
     ProcessingStarted = 20,

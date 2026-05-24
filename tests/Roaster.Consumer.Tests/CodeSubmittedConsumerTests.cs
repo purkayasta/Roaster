@@ -93,7 +93,7 @@ public class CodeSubmittedConsumerTests : IDisposable
     }
 
     [Fact]
-    public async Task HappyPath_SubmissionEventsWritten()
+    public async Task HappyPath_EventsWritten()
     {
         var sub = await SeedSubmission();
         _ai.Setup(a => a.ReviewCodeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -102,9 +102,9 @@ public class CodeSubmittedConsumerTests : IDisposable
         var ctx = FakeConsumeContext.For(new CodeSubmittedEvent(sub.Id, Guid.NewGuid(), DateTime.UtcNow));
         await _consumer.Consume(ctx);
 
-        var events = _db.SubmissionEvents.Where(e => e.SubmissionId == sub.Id).ToList();
-        events.Should().Contain(e => e.EventType == SubmissionEventType.ProcessingStarted);
-        events.Should().Contain(e => e.EventType == SubmissionEventType.ReviewCompleted);
+        var events = _db.Events.Where(e => e.SubmissionId == sub.Id).ToList();
+        events.Should().Contain(e => e.EventType == EventType.ProcessingStarted);
+        events.Should().Contain(e => e.EventType == EventType.ReviewCompleted);
     }
 
     [Fact]
@@ -154,6 +154,6 @@ public class CodeSubmittedConsumerTests : IDisposable
         var updated = await _db.Submissions.FindAsync(sub.Id);
         updated!.Status.Should().Be(SubmissionStatus.Failed);
 
-        _db.SubmissionEvents.Should().Contain(e => e.EventType == SubmissionEventType.Failed);
+        _db.Events.Should().Contain(e => e.EventType == EventType.Failed);
     }
 }

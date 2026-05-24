@@ -64,4 +64,7 @@ public static class CodeUtils
 
     public static Task ClearDecorationsAsync(IJSRuntime js, string[] decorationIds) =>
         js.InvokeVoidAsync("RoasterReview.clearDecorations", EditorId, decorationIds).AsTask();
+
+    public static Task SyncOverlayAsync(IJSRuntime js) =>
+        js.InvokeVoidAsync("RoasterReview.syncOverlay", EditorId, "roaster-comment-overlay").AsTask();
 }

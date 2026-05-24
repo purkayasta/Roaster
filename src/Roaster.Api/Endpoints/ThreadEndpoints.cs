@@ -65,11 +65,11 @@ public static class ThreadEndpoints
                 };
 
                 db.ThreadReplies.Add(reply);
-                db.SubmissionEvents.Add(new SubmissionEvent
+                db.Events.Add(new Event
                 {
                     SubmissionId  = submissionId,
                     SessionId     = correlationId,
-                    EventType     = SubmissionEventType.UserReplied,
+                    EventType     = EventType.UserReplied,
                     CorrelationId = correlationId,
                     OccurredAt    = DateTime.UtcNow
                 });

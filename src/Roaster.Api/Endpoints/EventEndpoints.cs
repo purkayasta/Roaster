@@ -24,7 +24,7 @@ public static class EventEndpoints
                 return Results.NotFound();
             }
 
-            var results = await db.SubmissionEvents
+            var results = await db.Events
                 .Where(e => sessionId == null || e.SessionId == sessionId)
                 .OrderByDescending(e => e.OccurredAt)
                 .Skip((page - 1) * pageSize)
@@ -37,10 +37,10 @@ public static class EventEndpoints
                     e.OccurredAt,
                     e.Submission.Payload.Language,
                     e.Metadata,
-                    e.EventType == SubmissionEventType.ReviewCompleted && e.Submission.Metrics != null ? e.Submission.Metrics.ModelId : null,
-                    e.EventType == SubmissionEventType.ReviewCompleted && e.Submission.Metrics != null ? (int?)e.Submission.Metrics.QueueWaitMs : null,
-                    e.EventType == SubmissionEventType.ReviewCompleted && e.Submission.Metrics != null ? (int?)e.Submission.Metrics.ReviewDurationMs : null,
-                    e.EventType == SubmissionEventType.ReviewCompleted && e.Submission.Metrics != null ? (int?)e.Submission.Metrics.TotalDurationMs : null
+                    e.EventType == EventType.ReviewCompleted && e.Submission.Metrics != null ? e.Submission.Metrics.ModelId : null,
+                    e.EventType == EventType.ReviewCompleted && e.Submission.Metrics != null ? (int?)e.Submission.Metrics.QueueWaitMs : null,
+                    e.EventType == EventType.ReviewCompleted && e.Submission.Metrics != null ? (int?)e.Submission.Metrics.ReviewDurationMs : null,
+                    e.EventType == EventType.ReviewCompleted && e.Submission.Metrics != null ? (int?)e.Submission.Metrics.TotalDurationMs : null
                 ))
                 .ToListAsync(ct);
 

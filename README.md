@@ -1,4 +1,5 @@
 # Roaster
+# Roaster
 
 Roaster is an AI-powered code review tool that gives you brutally honest, inline feedback directly inside a Monaco editor. Paste your code, hit **Roast Me**, and the AI drops sarcastic comments right on the lines that deserve it.
 
@@ -65,7 +66,7 @@ The short version:
 ```bash
 # 1. Start Ollama natively (runs outside Docker on Mac)
 ollama serve
-ollama pull phi4-mini
+ollama pull deepseek-coder:1.3b
 
 # 2. Build and start everything
 make up

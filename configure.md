@@ -36,7 +36,7 @@ ollama serve &> /tmp/ollama.log &
 ### Pull the model (one-time, ~2.5 GB)
 
 ```bash
-ollama pull phi4-mini
+ollama pull deepseek-coder:1.3b
 ```
 
 Verify the model is available:
@@ -45,7 +45,7 @@ Verify the model is available:
 ollama list
 ```
 
-You should see `phi4-mini` in the output.
+You should see `deepseek-coder:1.3b` in the output.
 
 ### Stop Ollama
 
@@ -170,7 +170,7 @@ All configuration is passed to containers via environment variables in `docker-c
 | `ConnectionStrings__Postgres` | *(set in compose)* | PostgreSQL connection string |
 | `RabbitMQ__Uri` | *(set in compose)* | RabbitMQ URI |
 | `Ollama__Endpoint` | `http://host.docker.internal:11434` | Ollama server URL |
-| `Ollama__ModelId` | `phi4-mini:latest` | Model to use for code review |
+| `Ollama__ModelId` | `deepseek-coder:1.3b` | Model to use for code review |
 
 ### Frontend
 
@@ -197,26 +197,26 @@ Change this before building if your API is on a different host or port.
 To use a different model, pull it first:
 
 ```bash
-ollama pull phi4-mini
+ollama pull deepseek-coder:1.3b
 ```
 
 Then pass the model name via env var (no file edit needed):
 
 ```bash
-OLLAMA_MODEL=phi4-mini:latest make up
+OLLAMA_MODEL=deepseek-coder:1.3b make up
 ```
 
 Or set it permanently in a `.env` file at the repo root:
 
 ```bash
-OLLAMA_MODEL=phi4-mini:latest
+OLLAMA_MODEL=deepseek-coder:1.3b
 ```
 
 Recommended models for Apple Silicon:
 
 | Model | Size | Notes |
 |---|---|---|
-| `phi4-mini:latest` | ~2.5 GB | Default — fast, low memory |
+| `deepseek-coder:1.3b` | ~2.5 GB | Default — fast, low memory |
 | `qwen2.5-coder:7b` | ~4.7 GB | Better quality, needs 8 GB+ RAM |
 | `qwen2.5-coder:3b` | ~2.0 GB | Good balance for M1 8 GB |
 | `deepseek-coder-v2:16b` | ~9.1 GB | Highest quality, needs M2 Pro / 16 GB+ |

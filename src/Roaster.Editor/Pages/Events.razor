@@ -91,11 +91,11 @@
                                 </MudGrid>
                             }
 
-                            @if (!string.IsNullOrEmpty(ev.Metadata))
+                            @if (!string.IsNullOrWhiteSpace(ev.Metadata))
                             {
-                                <MudStack Spacing="0">
+                                <MudStack Spacing="1">
                                     <MudText Typo="Typo.caption" Color="Color.Secondary">Metadata</MudText>
-                                    <MudText Typo="Typo.body2">@ev.Metadata</MudText>
+                                    <JsonViewer Json="@ev.Metadata" />
                                 </MudStack>
                             }
                         </MudStack>

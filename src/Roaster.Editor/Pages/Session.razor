@@ -1,0 +1,92 @@
+@page "/session/{Id}"
+@page "/session/"
+@inherits EditorComponentBase
+@inject SessionService SessionService
+
+<PageTitle>@(_session?.Name ?? "Session")</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False" Class="pa-4"
+              Style="height:100%; display:flex; flex-direction:column; box-sizing:border-box; overflow:hidden;">
+    @if (Running)
+    {
+        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height: 60vh;">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </MudStack>
+    }
+    else if (_session is null)
+    {
+        <MudText Color="Color.Error">Session not found.</MudText>
+    }
+    else
+    {
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.h5">@_session.Name</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@Id</MudText>
+            </MudStack>
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                @if (_session.TotalComments > 0)
+                {
+                    <MudChip T="string"
+                             Color="@(_session.ResolvedComments < _session.TotalComments ? Color.Warning : Color.Default)"
+                             Variant="Variant.Outlined" Size="Size.Small">
+                        @_session.ResolvedComments/@_session.TotalComments comments
+                    </MudChip>
+                }
+                @if (_session.Status is not null)
+                {
+                    <MudChip T="string" Color="StatusColor(_session.Status)" Variant="Variant.Filled">
+                        @_session.Status
+                    </MudChip>
+                }
+            </MudStack>
+        </MudStack>
+
+        <MudStack Row="true" Style="flex:1; min-height:0;" Spacing="2">
+            <div style="flex:1; min-height:0; display:flex; flex-direction:column;">
+                <Code SessionId="@_session.Id" SubmissionId="@_session.SubmissionId" Content="@_session.CodeContent"
+                      Language="@_session.Language" OnCommentResolved="OnCommentResolved" />
+            </div>
+
+        </MudStack>
+    }
+</MudContainer>
+
+@code {
+    [Parameter] public string? Id { get; set; }
+
+    private SessionDetailResponse? _session;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Guid.TryParse(Id, out var sessionId)) return;
+
+        await RunLogException(async () =>
+        {
+            var result = await SessionService.GetByIdAsync(sessionId);
+            if (result.IsSuccess)
+            {
+                _session = result.Data;
+            }
+            else
+            {
+                Snackbar.Add(result.Error ?? $"Failed to load session ({result.StatusCode}).", Severity.Error);
+                _session = null;
+            }
+        });
+    }
+
+    private void OnCommentResolved()
+    {
+        if (_session is null) return;
+        _session = _session with { ResolvedComments = _session.ResolvedComments + 1 };
+    }
+
+    private static Color StatusColor(string? status) => status switch
+    {
+        "Completed" => Color.Success,
+        "Processing" => Color.Warning,
+        "Failed" => Color.Error,
+        _ => Color.Default
+    };
+}

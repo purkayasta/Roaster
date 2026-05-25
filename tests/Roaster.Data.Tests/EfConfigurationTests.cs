@@ -1,3 +1,8 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Roaster.Data.Context;
@@ -5,7 +10,7 @@ using Roaster.Data.Models;
 
 namespace Roaster.Data.Tests;
 
-public class EfConfigurationTests
+public sealed class EfConfigurationTests
 {
     private static RoasterDbContext BuildDb() =>
         new(new DbContextOptionsBuilder<RoasterDbContext>()
@@ -38,11 +43,11 @@ public class EfConfigurationTests
     }
 
     [Fact]
-    public void SubmissionEvent_Metadata_IsNullable()
+    public void Event_Metadata_IsNullable()
     {
         using var db = BuildDb();
-        var entityType = db.Model.FindEntityType(typeof(SubmissionEvent))!;
-        var prop = entityType.FindProperty(nameof(SubmissionEvent.Metadata))!;
+        var entityType = db.Model.FindEntityType(typeof(Event))!;
+        var prop = entityType.FindProperty(nameof(Event.Metadata))!;
 
         prop.IsNullable.Should().BeTrue();
     }
@@ -51,9 +56,15 @@ public class EfConfigurationTests
     public async Task SaveChangesAsync_UpdatesSubmissionUpdatedAt()
     {
         using var db = BuildDb();
+
+        var session = new Session { Name = "test", CreatedAt = DateTime.UtcNow };
+        db.Sessions.Add(session);
+        await db.SaveChangesAsync();
+
         var sub = new Submission
         {
-            Payload = new CodePayload { Content = "x", Language = "csharp" },
+            SessionId = session.Id,
+            Payload   = new CodePayload { Content = "x", Language = "csharp" },
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow.AddDays(-1)
         };

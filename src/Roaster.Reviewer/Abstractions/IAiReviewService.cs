@@ -1,8 +1,15 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
+using Roaster.Reviewer.Models;
+
 namespace Roaster.Reviewer.Abstractions;
 
 public interface IAiReviewService
 {
-    Task<AiReviewResult> ReviewCodeAsync(
+    Task<ReviewerResult> ReviewCodeAsync(
         string code,
         string language,
         CancellationToken ct = default);
@@ -14,10 +21,3 @@ public interface IAiReviewService
         string userMessage,
         CancellationToken ct = default);
 }
-
-public record AiReviewResult(string? Summary, List<AiLineComment> LineComments);
-
-// Severity as int to match ReviewSeverity enum: 10=Gentle, 20=Medium, 30=Brutal
-public record AiLineComment(int LineNumber, string? Comment, int Severity);
-
-public record AiChatMessage(string Role, string Content); // "user" | "assistant"

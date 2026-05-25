@@ -10,6 +10,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - roaster-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U roaster -d roaster"]
       interval: 10s
@@ -25,6 +27,8 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    networks:
+      - roaster-net
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 15s
@@ -39,6 +43,8 @@ services:
     environment:
       MIGRATION_CONNECTION_STRING: >-
         Host=postgres;Database=roaster;Username=roaster;Password=${POSTGRES_PASSWORD:-changeme}
+    networks:
+      - roaster-net
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,10 +59,14 @@ services:
         Host=postgres;Database=roaster;Username=roaster;Password=${POSTGRES_PASSWORD:-changeme}
       RabbitMQ__Uri: "rabbitmq://guest:${RABBITMQ_PASSWORD:-guest}@rabbitmq"
       Ollama__Endpoint: "http://host.docker.internal:11434"
-      Ollama__ModelId: "qwen2.5-coder:7b"
+      Ollama__ModelId: ${OLLAMA_MODEL:-qwen2.5-coder:3b}
+    networks:
+      - roaster-net
     depends_on:
-      migration:
-        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   roaster-api:
@@ -70,9 +80,15 @@ services:
         Host=postgres;Database=roaster;Username=roaster;Password=${POSTGRES_PASSWORD:-changeme}
       RabbitMQ__Uri: "rabbitmq://guest:${RABBITMQ_PASSWORD:-guest}@rabbitmq"
       Cors__Origins__0: "http://localhost:5094"
+    networks:
+      - roaster-net
     depends_on:
       roaster-consumer:
         condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
       interval: 15s
@@ -86,10 +102,16 @@ services:
       dockerfile: docker/Dockerfile.frontend
     ports:
       - "5094:80"
+    networks:
+      - roaster-net
     depends_on:
       roaster-api:
-        condition: service_healthy
+        condition: service_started
     restart: unless-stopped
+
+networks:
+  roaster-net:
+    name: roaster-net
 
 volumes:
   postgres_data:

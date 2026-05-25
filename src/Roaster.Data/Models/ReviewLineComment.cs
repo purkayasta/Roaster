@@ -1,6 +1,11 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 namespace Roaster.Data.Models;
 
-public record ReviewLineComment
+public sealed record ReviewLineComment
 {
     public int LineNumber { get; init; }
     public string? Comment { get; init; }

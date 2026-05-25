@@ -1,3 +1,8 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 using MassTransit;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -12,7 +17,7 @@ using Roaster.Data.Context;
 
 namespace Roaster.Api.Tests;
 
-public class ApiFactory : WebApplicationFactory<Program>
+public sealed class ApiFactory : WebApplicationFactory<Program>
 {
     // Shared root ensures test-scope writes are visible inside HTTP request scopes
     private static readonly InMemoryDatabaseRoot DbRoot = new();

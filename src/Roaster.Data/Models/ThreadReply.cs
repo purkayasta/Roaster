@@ -1,6 +1,11 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 namespace Roaster.Data.Models;
 
-public class ThreadReply
+public sealed class ThreadReply
 {
     public long Id { get; init; }
     public long ThreadId { get; init; }

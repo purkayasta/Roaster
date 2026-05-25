@@ -1,25 +1,33 @@
-﻿<NavLink href="" Match="NavLinkMatch.All">
-    <MudNavLink Icon="@Icons.Material.Filled.Home" Href="" Match="NavLinkMatch.All">
-        Home
-    </MudNavLink>
-</NavLink>
-<NavLink href="counter">
-    <MudNavLink Icon="@Icons.Material.Filled.Add" Href="counter">
-        Counter
-    </MudNavLink>
-</NavLink>
-<NavLink href="code-editor">
-    <MudNavLink Icon="@Icons.Material.Filled.Code" Href="code-editor">
-        Code Editor
-    </MudNavLink>
-</NavLink>
-<NavLink href="code-workspace">
-    <MudNavLink Icon="@Icons.Material.Filled.Reviews" Href="code-workspace">
-        PR Review
-    </MudNavLink>
-</NavLink>
-<NavLink href="roast-my-code">
-    <MudNavLink Icon="@Icons.Material.Filled.LocalFireDepartment" Href="roast-my-code">
-        Roast My Code
-    </MudNavLink>
-</NavLink>
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+    <MudButton Href="/" Variant="Variant.Text" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Dashboard"
+               Size="Size.Medium" Class="@NavClass("/")" Style="border-radius:8px;">
+        Dashboard
+    </MudButton>
+    <MudButton Href="events" Variant="Variant.Text" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Timeline"
+               Size="Size.Medium" Class="@NavClass("events")" Style="border-radius:8px;">
+        Event Log
+    </MudButton>
+</MudStack>
+
+@code {
+    private bool IsActive(string href)
+    {
+        var path = Navigation.ToBaseRelativePath(Navigation.Uri).TrimEnd('/');
+        if (href == "/") return path == "";
+        return path == href || path.StartsWith(href + "/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string NavClass(string href) => IsActive(href) ? "roaster-nav-active" : "";
+
+    protected override void OnInitialized() =>
+        Navigation.LocationChanged += OnLocationChanged;
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) =>
+        StateHasChanged();
+
+    public void Dispose() =>
+        Navigation.LocationChanged -= OnLocationChanged;
+}

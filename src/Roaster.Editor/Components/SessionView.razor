@@ -1,0 +1,45 @@
+@inherits EditorComponentBase
+@inject SessionService SessionService
+
+<MudDataGrid T="SessionSubmissionResponse" Items="Sessions" Filterable="false" SortMode="SortMode.None"
+             Groupable="false" Hover="true" Striped="true" RowsPerPage="PageSize">
+    <Columns>
+        <PropertyColumn Property="x => x.SessionName" Title="Session Name" />
+        <PropertyColumn Property="x => x.Language" Title="Language" />
+        <PropertyColumn Property="x => x.SessionCreatedAt" Title="Created At" Format="yyyy-MM-dd HH:mm" />
+        <TemplateColumn Title="Comments">
+            <CellTemplate>
+                @if (context.Item.TotalComments > 0)
+                {
+                    <MudText Typo="Typo.body2"
+                             Color="@(context.Item.ResolvedComments < context.Item.TotalComments ? Color.Warning : Color.Default)">
+                        @context.Item.ResolvedComments/@context.Item.TotalComments
+                    </MudText>
+                }
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Action">
+            <CellTemplate>
+                <MudStack Row="true" Spacing="1">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small"
+                                   OnClick="() => OnEdit.InvokeAsync(context.Item.SessionId)" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                   OnClick="() => OnDelete.InvokeAsync(context.Item.SessionId)" />
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <NoRecordsContent>
+        <MudText Class="pa-4">No sessions found. Click <b>New</b> to get started.</MudText>
+    </NoRecordsContent>
+    <PagerContent>
+        <MudDataGridPager T="SessionSubmissionResponse" />
+    </PagerContent>
+</MudDataGrid>
+
+@code {
+    [Parameter, EditorRequired] public List<SessionSubmissionResponse> Sessions { get; set; } = [];
+    [Parameter, EditorRequired] public int PageSize { get; set; }
+    [Parameter, EditorRequired] public EventCallback<Guid> OnEdit { get; set; }
+    [Parameter, EditorRequired] public EventCallback<Guid> OnDelete { get; set; }
+}

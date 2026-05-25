@@ -1,0 +1,156 @@
+/* ── Typography ─────────────────────────────────────────────────────────── */
+html,
+body {
+    font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Browsers reset font-family on inputs/buttons/selects — pull them back */
+* {
+    font-family: inherit;
+}
+
+code,
+pre,
+kbd,
+samp {
+    font-family: 'Geist Mono', 'Cascadia Code', 'Fira Code', monospace;
+}
+
+/* ── App bar ────────────────────────────────────────────────────────────── */
+.roaster-appbar {
+    background-color: #18181b !important;
+    color: white !important;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+.roaster-appbar-dark {
+    background-color: #1c1c2e !important;
+}
+
+/* All icons and text inside the bar inherit white */
+.roaster-appbar .mud-icon-button,
+.roaster-appbar .mud-icon-root,
+.roaster-appbar .mud-typography {
+    color: inherit !important;
+}
+
+/* Nav link buttons — inactive: transparent with white text */
+.roaster-appbar .mud-button-root {
+    color: rgba(255, 255, 255, 0.75) !important;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.roaster-appbar .mud-button-root:hover {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    color: white !important;
+}
+
+/* Nav link — active state */
+.roaster-appbar .roaster-nav-active {
+    background-color: rgba(255, 255, 255, 0.14) !important;
+    color: white !important;
+}
+
+/* Focus — replace MudBlazor's light-mode ring with a clean white outline */
+.roaster-appbar .mud-button-root:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.6) !important;
+    outline-offset: 2px !important;
+    box-shadow: none !important;
+}
+
+.roaster-appbar .mud-icon-button:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.6) !important;
+    outline-offset: 2px !important;
+    box-shadow: none !important;
+}
+
+/* ── Monaco editor host ─────────────────────────────────────────────────── */
+#code-editor-main {
+    height: 100%;
+}
+
+/* ── Glyph margin icons ─────────────────────────────────────────────────── */
+.roaster-glyph-error {
+    background: #f44336;
+    border-radius: 50%;
+    width: 10px !important;
+    height: 10px !important;
+    margin: 4px;
+}
+
+.roaster-glyph-warning {
+    background: #ff9800;
+    border-radius: 50%;
+    width: 10px !important;
+    height: 10px !important;
+    margin: 4px;
+}
+
+.roaster-glyph-info {
+    background: #2196f3;
+    border-radius: 50%;
+    width: 10px !important;
+    height: 10px !important;
+    margin: 4px;
+}
+
+/* ── Line highlights ────────────────────────────────────────────────────── */
+.roaster-line-error {
+    background: rgba(244, 67, 54, 0.08) !important;
+}
+
+.roaster-line-warning {
+    background: rgba(255, 152, 0, 0.08) !important;
+}
+
+.roaster-line-info {
+    background: rgba(33, 150, 243, 0.08) !important;
+}
+
+/* ── Review comment box (rendered inside Monaco ViewZone) ───────────────── */
+.roaster-review-comment {
+    padding: 8px 12px;
+    font-size: 13px;
+    border-left: 3px solid #555;
+    background: var(--mud-palette-surface, #1e1e1e);
+    color: var(--mud-palette-text-primary, #d4d4d4);
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.roaster-review-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.roaster-severity-chip {
+    height: 20px !important;
+    font-size: 11px !important;
+}
+
+.roaster-comment-text {
+    margin: 4px 0;
+}
+
+/* ── Thread replies ─────────────────────────────────────────────────────── */
+.roaster-replies {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.roaster-reply {
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.roaster-reply-ai {
+    background: rgba(33, 150, 243, 0.12);
+    border-left: 2px solid #2196f3;
+}
+
+.roaster-reply-user {
+    background: rgba(76, 175, 80, 0.12);
+    border-left: 2px solid #4caf50;
+}

@@ -1,10 +1,11 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
 WORKDIR /src
 COPY Roaster.slnx ./
 COPY src/ src/
 RUN dotnet restore src/Roaster.Editor/Roaster.Editor.csproj
 RUN dotnet publish src/Roaster.Editor/Roaster.Editor.csproj \
-    -c Release -o /app/publish --no-restore
+    -c Release -o /app/publish --no-restore \
+    -p:WasmFingerprintAssets=false
 
 FROM nginx:alpine AS runtime
 COPY --from=build /app/publish/wwwroot /usr/share/nginx/html

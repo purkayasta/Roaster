@@ -1,18 +1,24 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Moq;
 using Roaster.Reviewer.Abstractions;
+using Roaster.Reviewer.Models;
 using Roaster.Reviewer.Services;
 
 namespace Roaster.Reviewer.Tests;
 
-public class ReplyToThreadAsyncTests
+public sealed class ReplyToThreadAsyncTests
 {
-    private static SemanticKernelAiReviewService BuildService(
+    private static AiReviewService BuildService(
         Mock<IChatCompletionService> chatMock)
-        => new(chatMock.Object, NullLogger<SemanticKernelAiReviewService>.Instance);
+        => new(chatMock.Object, NullLogger<AiReviewService>.Instance);
 
     private static void SetupChatReply(Mock<IChatCompletionService> mock, string reply)
     {

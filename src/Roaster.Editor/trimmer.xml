@@ -1,0 +1,14 @@
+<linker>
+  <!-- Preserve Blazor component infrastructure (activated via reflection) -->
+  <assembly fullname="Roaster.Editor" preserve="all" />
+
+  <!-- Preserve System.Text.Json source-gen paths used by MudBlazor and HttpClient -->
+  <assembly fullname="System.Text.Json">
+    <type fullname="System.Text.Json.*" preserve="all" />
+  </assembly>
+
+  <!-- Preserve JS interop marshalling -->
+  <assembly fullname="Microsoft.JSInterop">
+    <type fullname="Microsoft.JSInterop.*" preserve="all" />
+  </assembly>
+</linker>

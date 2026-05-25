@@ -1,0 +1,37 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
+using Microsoft.AspNetCore.Components;
+using MudBlazor;
+
+namespace Roaster.Editor.Shared;
+
+public abstract class EditorComponentBase : ComponentBase
+{
+    [Inject] public ISnackbar Snackbar { get; set; } = null!;
+    [Inject] public IDialogService DialogService { get; set; } = null!;
+    [Inject] public NavigationManager Navigation { get; set; } = null!;
+
+    protected bool Running { get; private set; }
+
+    protected async Task RunLogException(Func<Task> action)
+    {
+        Running = true;
+        StateHasChanged();
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            Running = false;
+            StateHasChanged();
+        }
+    }
+}

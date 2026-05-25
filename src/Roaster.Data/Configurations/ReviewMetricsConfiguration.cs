@@ -1,10 +1,15 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Roaster.Data.Models;
 
 namespace Roaster.Data.Configurations;
 
-public class ReviewMetricsConfiguration : IEntityTypeConfiguration<ReviewMetrics>
+public sealed class ReviewMetricsConfiguration : IEntityTypeConfiguration<ReviewMetrics>
 {
     public void Configure(EntityTypeBuilder<ReviewMetrics> builder)
     {

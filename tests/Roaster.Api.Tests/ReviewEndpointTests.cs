@@ -1,3 +1,8 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
@@ -8,17 +13,23 @@ using Roaster.Data.Models;
 
 namespace Roaster.Api.Tests;
 
-public class ReviewEndpointTests(ApiFactory factory) : IClassFixture<ApiFactory>
+public sealed class ReviewEndpointTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
     private HttpClient Client => factory.CreateClient();
 
-    private async Task<Submission> SeedSubmission(RoasterDbContext db, SubmissionStatus status = SubmissionStatus.Pending)
+    private async Task<Submission> SeedSubmission(RoasterDbContext db, SubmissionStatus status = SubmissionStatus.Submitted)
     {
+        var session = new Session { Name = "test", CreatedAt = DateTime.UtcNow };
+        db.Sessions.Add(session);
+        await db.SaveChangesAsync();
+
         var sub = new Submission
         {
-            Payload = new CodePayload { Content = "x", Language = "csharp" },
-            Status = status,
-            CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
+            SessionId = session.Id,
+            Payload   = new CodePayload { Content = "x", Language = "csharp" },
+            Status    = status,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
         db.Submissions.Add(sub);
         await db.SaveChangesAsync();
@@ -37,7 +48,7 @@ public class ReviewEndpointTests(ApiFactory factory) : IClassFixture<ApiFactory>
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<RoasterDbContext>();
-        var sub = await SeedSubmission(db, SubmissionStatus.Pending);
+        var sub = await SeedSubmission(db, SubmissionStatus.Submitted);
 
         var resp = await Client.GetAsync($"/api/submissions/{sub.Id}/review");
         resp.StatusCode.Should().Be(HttpStatusCode.NoContent);

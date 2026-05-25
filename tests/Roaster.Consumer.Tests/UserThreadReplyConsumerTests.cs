@@ -1,8 +1,15 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using Roaster.Consumer.Consumers;
+using Roaster.Consumer.Processors;
+using Roaster.Consumer.Services;
+using Roaster.Reviewer.Models;
 using Roaster.Consumer.Tests.Helpers;
 using Roaster.Contracts.Events;
 using Roaster.Data.Context;
@@ -11,20 +18,21 @@ using Roaster.Reviewer.Abstractions;
 
 namespace Roaster.Consumer.Tests;
 
-public class UserThreadReplyConsumerTests : IDisposable
+public sealed class ReplyProcessorTests : IDisposable
 {
     private readonly RoasterDbContext _db;
     private readonly Mock<IAiReviewService> _ai;
-    private readonly UserThreadReplyConsumer _consumer;
+    private readonly ReplyProcessor _consumer;
 
-    public UserThreadReplyConsumerTests()
+    public ReplyProcessorTests()
     {
         var options = new DbContextOptionsBuilder<RoasterDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         _db = new RoasterDbContext(options);
         _ai = new Mock<IAiReviewService>();
-        _consumer = new UserThreadReplyConsumer(_db, _ai.Object, NullLogger<UserThreadReplyConsumer>.Instance);
+        var service = new ThreadReplyService(_db, _ai.Object, NullLogger<ThreadReplyService>.Instance);
+        _consumer = new ReplyProcessor(service);
     }
 
     public void Dispose() => _db.Dispose();
@@ -32,10 +40,16 @@ public class UserThreadReplyConsumerTests : IDisposable
     private async Task<(Submission sub, Review review, CommentThread thread)> SeedThread(
         List<ThreadReply>? replies = null)
     {
+        var session = new Session { Name = "test", CreatedAt = DateTime.UtcNow };
+        _db.Sessions.Add(session);
+        await _db.SaveChangesAsync();
+
         var sub = new Submission
         {
-            Payload = new CodePayload { Content = "var x = 1;", Language = "csharp" },
-            CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow
+            SessionId = session.Id,
+            Payload   = new CodePayload { Content = "var x = 1;", Language = "csharp" },
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
         _db.Submissions.Add(sub);
         await _db.SaveChangesAsync();
@@ -69,7 +83,7 @@ public class UserThreadReplyConsumerTests : IDisposable
     [Fact]
     public async Task ThreadNotFound_ReturnsWithoutThrowing()
     {
-        var ctx = FakeConsumeContext.For(new UserThreadReplyEvent(999L, 1L, 5, Guid.NewGuid(), DateTime.UtcNow));
+        var ctx = FakeConsumeContext.For(new ReplyEvent(999L, 1L, 5, Guid.NewGuid(), DateTime.UtcNow));
         await _consumer.Consume(ctx);
     }
 
@@ -86,7 +100,7 @@ public class UserThreadReplyConsumerTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync("AI response here");
 
-        var ctx = FakeConsumeContext.For(new UserThreadReplyEvent(thread.Id, sub.Id, 5, Guid.NewGuid(), DateTime.UtcNow));
+        var ctx = FakeConsumeContext.For(new ReplyEvent(thread.Id, sub.Id, 5, Guid.NewGuid(), DateTime.UtcNow));
         await _consumer.Consume(ctx);
 
         var aiReply = _db.ThreadReplies.FirstOrDefault(r => r.IsAiReply);
@@ -107,10 +121,10 @@ public class UserThreadReplyConsumerTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync("reply");
 
-        var ctx = FakeConsumeContext.For(new UserThreadReplyEvent(thread.Id, sub.Id, 5, Guid.NewGuid(), DateTime.UtcNow));
+        var ctx = FakeConsumeContext.For(new ReplyEvent(thread.Id, sub.Id, 5, Guid.NewGuid(), DateTime.UtcNow));
         await _consumer.Consume(ctx);
 
-        _db.SubmissionEvents.Should().Contain(e => e.EventType == SubmissionEventType.AiReplied);
+        _db.Events.Should().Contain(e => e.EventType == EventType.AiReplied);
     }
 
     [Fact]
@@ -131,7 +145,7 @@ public class UserThreadReplyConsumerTests : IDisposable
                 (_, _, history, _, _) => capturedHistory = history)
             .ReturnsAsync("ok");
 
-        var ctx = FakeConsumeContext.For(new UserThreadReplyEvent(thread.Id, sub.Id, 5, Guid.NewGuid(), DateTime.UtcNow));
+        var ctx = FakeConsumeContext.For(new ReplyEvent(thread.Id, sub.Id, 5, Guid.NewGuid(), DateTime.UtcNow));
         await _consumer.Consume(ctx);
 
         // Prior history passed (all but last user message)

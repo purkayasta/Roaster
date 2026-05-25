@@ -34,23 +34,4 @@ public abstract class EditorComponentBase : ComponentBase
             StateHasChanged();
         }
     }
-
-    protected void RunLogException(Action action)
-    {
-        Running = true;
-        StateHasChanged();
-        try
-        {
-            action();
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add(ex.Message, Severity.Error);
-        }
-        finally
-        {
-            Running = false;
-            StateHasChanged();
-        }
-    }
 }

@@ -42,11 +42,11 @@ public sealed class ThreadService(RoasterDbContext db, IPublishEndpoint publishe
         db.ThreadReplies.Add(reply);
         db.Events.Add(new Roaster.Data.Models.Event
         {
-            SubmissionId  = submissionId,
-            SessionId     = correlationId,
-            EventType     = EventType.UserReplied,
+            SubmissionId = submissionId,
+            SessionId = correlationId,
+            EventType = EventType.UserReplied,
             CorrelationId = correlationId,
-            OccurredAt    = DateTime.UtcNow
+            OccurredAt = DateTime.UtcNow
         });
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
@@ -72,14 +72,30 @@ public sealed class ThreadService(RoasterDbContext db, IPublishEndpoint publishe
         return ServiceResult<List<ThreadReplyDto>>.Ok(replies);
     }
 
-    public async Task<ServiceResult> ResolveThreadAsync(long threadId, CancellationToken ct)
+    public async Task<ServiceResult> ResolveAsync(long submissionId, long reviewId, int lineNumber, CancellationToken ct)
     {
-        var thread = await db.CommentThreads.FindAsync([threadId], ct);
-        if (thread is null) return ServiceResult.NotFound();
+        var review = await db.Reviews
+            .Include(r => r.Threads)
+            .FirstOrDefaultAsync(r => r.Id == reviewId && r.SubmissionId == submissionId, ct);
 
-        thread.Status = ThreadStatus.Resolved;
+        if (review is null) return ServiceResult.NotFound();
+
+        if (!review.Comments.Any(c => c.LineNumber == lineNumber))
+            return ServiceResult.NotFound();
+
+        var thread = review.Threads.FirstOrDefault(t => t.LineNumber == lineNumber);
+        if (thread is null)
+        {
+            thread = new CommentThread { ReviewId = reviewId, LineNumber = lineNumber, CreatedAt = DateTime.UtcNow, Status = ThreadStatus.Resolved };
+            db.CommentThreads.Add(thread);
+        }
+        else
+        {
+            thread.Status = ThreadStatus.Resolved;
+        }
+
         await db.SaveChangesAsync(ct);
-        logger.LogInformation("Thread {ThreadId} resolved", threadId);
-        return ServiceResult.Ok();
+        logger.LogInformation("Review {ReviewId} line {LineNumber} resolved", reviewId, lineNumber);
+        return ServiceResult.NoContent();
     }
 }

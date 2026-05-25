@@ -15,8 +15,9 @@ public static class ThreadEndpoints
                 return Results.Accepted(null, result.Data);
             }).WithName("CreateThread");
 
-        app.MapPatch("/api/threads/{threadId:long}/resolve", async (long threadId, ThreadService service, CancellationToken ct) =>
-            await service.ResolveThreadAsync(threadId, ct)
+        app.MapPatch("/api/submissions/{submissionId:long}/reviews/{reviewId:long}/lines/{lineNumber:int}/resolve",
+            async (long submissionId, long reviewId, int lineNumber, ThreadService service, CancellationToken ct) =>
+                await service.ResolveAsync(submissionId, reviewId, lineNumber, ct)
         ).WithName("ResolveThread");
 
         app.MapGet("/api/threads/{threadId:long}/replies", async (long threadId, ThreadService service, CancellationToken ct) =>

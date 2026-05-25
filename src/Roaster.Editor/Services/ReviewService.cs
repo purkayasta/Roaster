@@ -30,9 +30,9 @@ public sealed class ReviewService(HttpClient client)
         return await ApiResponse<List<ThreadReplyResponse>>.FromAsync(response);
     }
 
-    public async Task<ApiResponse<object?>> ResolveAsync(long threadId, CancellationToken ct = default)
+    public async Task<ApiResponse<object?>> ResolveAsync(long submissionId, long reviewId, int lineNumber, CancellationToken ct = default)
     {
-        var response = await client.PatchAsync($"/api/threads/{threadId}/resolve", null, ct);
+        var response = await client.PatchAsync($"/api/submissions/{submissionId}/reviews/{reviewId}/lines/{lineNumber}/resolve", null, ct);
         return await ApiResponse<object?>.FromAsync(response);
     }
 }

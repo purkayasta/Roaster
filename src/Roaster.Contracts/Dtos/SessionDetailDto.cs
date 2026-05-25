@@ -12,4 +12,6 @@ public sealed record SessionDetailDto(
     string? CodeContent,
     string? Language,
     string? Status,
-    long? SubmissionId);
+    long? SubmissionId,
+    int TotalComments,
+    int ResolvedComments);

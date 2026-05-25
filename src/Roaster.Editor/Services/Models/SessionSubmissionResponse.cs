@@ -11,4 +11,6 @@ public record SessionSubmissionResponse(
     string SessionName,
     string? Language,
     string? Status,
-    DateTime SessionCreatedAt);
+    DateTime SessionCreatedAt,
+    int TotalComments,
+    int ResolvedComments);

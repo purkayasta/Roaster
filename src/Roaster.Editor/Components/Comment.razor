@@ -20,7 +20,7 @@
             }
         </MudStack>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="0">
-            @if (!_isResolved && _threadId is not null)
+            @if (!_isResolved)
             {
                 <MudButton Size="Size.Small" Color="Color.Success" Variant="Variant.Text" Disabled="Running"
                            OnClick="ResolveAsync" Style="min-width:0; padding:2px 6px; font-size:11px;">
@@ -107,6 +107,7 @@
     protected override async Task OnInitializedAsync()
     {
         _isResolved = CommentData.IsResolved;
+        _collapsed  = _isResolved;
         if (CommentData.ThreadId is not { } threadId) return;
 
         _threadId = threadId;
@@ -151,7 +152,7 @@
             if (_threadId is { } threadId)
             {
                 await LoadRepliesAsync(threadId);
-                StartAiReplyPolling(threadId);
+                _ = PollForAiReplyAsync(threadId);
             }
             else
             {
@@ -161,7 +162,7 @@
         });
     }
 
-    private void StartAiReplyPolling(long threadId)
+    private async Task PollForAiReplyAsync(long threadId)
     {
         _aiPollCts?.Cancel();
         _aiPollCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
@@ -170,41 +171,45 @@
 
         _waitingForAi = true;
 
-        _ = Task.Run(async () =>
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+        try
         {
-            while (!ct.IsCancellationRequested)
+            while (await timer.WaitForNextTickAsync(ct))
             {
-                await Task.Delay(2000, ct).ContinueWith(_ => { });
-                if (ct.IsCancellationRequested) break;
-
                 var result = await ReviewService.GetRepliesAsync(threadId);
                 if (result.IsSuccess && result.Data is not null && result.Data.Count > countAfterUserReply)
                 {
-                    await InvokeAsync(async () =>
-                    {
-                        _replies = result.Data;
-                        _waitingForAi = false;
-                        StateHasChanged();
-                        await OnZoneResize.InvokeAsync();
-                    });
-                    break;
+                    _replies = result.Data;
+                    _waitingForAi = false;
+                    StateHasChanged();
+                    await OnZoneResize.InvokeAsync();
+                    return;
                 }
             }
-
-            await InvokeAsync(() => { _waitingForAi = false; StateHasChanged(); });
-        }, ct);
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            _waitingForAi = false;
+            StateHasChanged();
+        }
     }
 
     private async Task ResolveAsync()
     {
-        if (_threadId is not { } threadId) return;
         await RunLogException(async () =>
         {
-            var result = await ReviewService.ResolveAsync(threadId);
+            var result = await ReviewService.ResolveAsync(SubmissionId, ReviewId, CommentData.LineNumber);
             if (result.IsSuccess)
+            {
                 _isResolved = true;
+                _collapsed  = true;
+                _pendingResize = true;
+            }
             else
+            {
                 Snackbar.Add(result.Error ?? $"Failed to resolve ({result.StatusCode}).", Severity.Error);
+            }
         });
     }
 

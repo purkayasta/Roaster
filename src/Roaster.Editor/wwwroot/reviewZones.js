@@ -1,12 +1,14 @@
 window.RoasterReview = {
     _zoneConfigs: {},
-    _overlaySubscribed: false,
+    _subscribedEditor: null,
+    _scrollDisposable: null,
+    _layoutDisposable: null,
+    _boundOverlayElement: null,
 
     addZone: function (editorId, lineNumber, domNode) {
         const editor = window.blazorMonaco.editor.getEditor(editorId, true);
         if (!editor) return null;
 
-        // Use an invisible spacer as the zone node — never put Blazor components into Monaco's DOM.
         const spacer = document.createElement('div');
         const height = domNode.scrollHeight || 120;
 
@@ -53,8 +55,6 @@ window.RoasterReview = {
 
             overlay.querySelectorAll('[data-line]').forEach(el => {
                 const lineNum = parseInt(el.dataset.line);
-                // Use the stored spacer height so top is always pinned to the top of the zone,
-                // regardless of whether the comment element itself is collapsed or expanded.
                 const config = Object.values(self._zoneConfigs).find(c => c.afterLineNumber === lineNum);
                 const zoneHeight = config ? config.heightInPx : (el.scrollHeight || 120);
                 const top = editor.getTopForLineNumber(lineNum + 1) - zoneHeight - scrollTop;
@@ -65,23 +65,25 @@ window.RoasterReview = {
             overlay.style.visibility = 'visible';
         };
 
-        if (!this._overlaySubscribed) {
-            editor.onDidScrollChange(update);
-            editor.onDidLayoutChange(update);
-            this._overlaySubscribed = true;
+        // Re-subscribe when the editor instance changes (e.g. after SPA navigation).
+        // Dispose old listeners to prevent accumulation on dead editor instances.
+        if (this._subscribedEditor !== editor) {
+            if (this._scrollDisposable) this._scrollDisposable.dispose();
+            if (this._layoutDisposable) this._layoutDisposable.dispose();
+            this._scrollDisposable = editor.onDidScrollChange(update);
+            this._layoutDisposable = editor.onDidLayoutChange(update);
+            this._subscribedEditor = editor;
         }
 
-        // Attach wheel forwarding to the overlay element itself. Use a flag on the
-        // element so re-calling syncOverlay (e.g. after a new review loads) re-binds
-        // if the element was recreated by Blazor.
+        // Track the overlay element reference — if Blazor recreates it, re-bind the wheel listener.
         const overlay = document.getElementById(overlayId);
-        if (overlay && !overlay._wheelBound) {
+        if (overlay && overlay !== this._boundOverlayElement) {
             overlay.addEventListener('wheel', (e) => {
                 e.preventDefault();
                 editor.setScrollTop(editor.getScrollTop() + e.deltaY);
                 editor.setScrollLeft(editor.getScrollLeft() + e.deltaX);
             }, { passive: false });
-            overlay._wheelBound = true;
+            this._boundOverlayElement = overlay;
         }
 
         update();

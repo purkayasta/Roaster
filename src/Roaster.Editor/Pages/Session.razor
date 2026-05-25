@@ -24,12 +24,22 @@
                 <MudText Typo="Typo.h5">@_session.Name</MudText>
                 <MudText Typo="Typo.caption" Color="Color.Secondary">@Id</MudText>
             </MudStack>
-            @if (_session.Status is not null)
-            {
-                <MudChip T="string" Color="StatusColor(_session.Status)" Variant="Variant.Filled">
-                    @_session.Status
-                </MudChip>
-            }
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                @if (_session.TotalComments > 0)
+                {
+                    <MudChip T="string"
+                             Color="@(_session.ResolvedComments < _session.TotalComments ? Color.Warning : Color.Default)"
+                             Variant="Variant.Outlined" Size="Size.Small">
+                        @_session.ResolvedComments/@_session.TotalComments comments
+                    </MudChip>
+                }
+                @if (_session.Status is not null)
+                {
+                    <MudChip T="string" Color="StatusColor(_session.Status)" Variant="Variant.Filled">
+                        @_session.Status
+                    </MudChip>
+                }
+            </MudStack>
         </MudStack>
 
         <MudStack Row="true" Style="flex:1; min-height:0;" Spacing="2">

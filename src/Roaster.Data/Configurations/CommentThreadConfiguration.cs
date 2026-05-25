@@ -17,7 +17,7 @@ public sealed class CommentThreadConfiguration : IEntityTypeConfiguration<Commen
         builder.Property(t => t.Id).UseIdentityByDefaultColumn();
         builder.Property(t => t.LineNumber).IsRequired();
         builder.Property(t => t.CreatedAt).IsRequired();
-        builder.Property(t => t.Status).IsRequired().HasColumnType("smallint").HasDefaultValue(ThreadStatus.Unresolved);
+        builder.Property(t => t.Status).IsRequired().HasColumnType("smallint");
 
         builder.HasMany(t => t.Replies)
                .WithOne(r => r.Thread)

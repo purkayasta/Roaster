@@ -118,6 +118,7 @@
     private List<EventLogResponse> _events = [];
     private bool _live;
     private CancellationTokenSource? _cts;
+    private PeriodicTimer? _pollTimer;
     private string _sessionIdInput = string.Empty;
     private Guid? _activeSessionId;
 
@@ -172,23 +173,26 @@
     {
         _page = 1;
         _cts = new CancellationTokenSource();
-        var token = _cts.Token;
-        _ = Task.Run(async () =>
+        _ = PollAsync(_cts.Token);
+    }
+
+    private async Task PollAsync(CancellationToken token)
+    {
+        _pollTimer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+        try
         {
-            var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
-            while (await timer.WaitForNextTickAsync(token))
+            while (await _pollTimer.WaitForNextTickAsync(token))
             {
-                try
-                {
-                    await FetchAsync();
-                    await InvokeAsync(StateHasChanged);
-                }
-                catch
-                {
-                    // swallow — next tick will retry
-                }
+                try { await FetchAsync(); StateHasChanged(); }
+                catch { }
             }
-        }, token);
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            _pollTimer.Dispose();
+            _pollTimer = null;
+        }
     }
 
     private void StopPolling()

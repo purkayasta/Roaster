@@ -24,9 +24,13 @@
     private readonly record struct JsonLine(int Indent, string? Key, string Value, string Color);
     private List<JsonLine> _lines = [];
     private JsonDocument? _doc;
+    private string? _lastJson;
 
     protected override void OnParametersSet()
     {
+        if (Json == _lastJson) return;
+        _lastJson = Json;
+
         _doc?.Dispose();
         _doc = null;
         _lines = [];

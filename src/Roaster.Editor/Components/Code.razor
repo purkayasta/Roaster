@@ -50,7 +50,7 @@
                  style="position:absolute; top:0; left:0; right:0; bottom:0; pointer-events:none; overflow:hidden; z-index:10; visibility:hidden;">
                 @foreach (var comment in _review.Comments)
                 {
-                    <div @ref="_commentRefs[comment.LineNumber]"
+                    <div @key="comment.LineNumber" @ref="_commentRefs[comment.LineNumber]"
                          data-line="@comment.LineNumber"
                          style="position:absolute; left:0; right:0; pointer-events:auto;">
                         <Comment SubmissionId="_submissionId!.Value" ReviewId="_review.Id" CommentData="comment"
@@ -88,7 +88,7 @@
         if (!string.IsNullOrWhiteSpace(Language))
             _language = Language;
 
-        await RunLogException(async () => await ThemeFactory.EnsureAllAsync(JS));
+        try { await ThemeFactory.EnsureAllAsync(JS); } catch { }
 
         if (SubmissionId is { } id)
         {
@@ -176,39 +176,42 @@
     {
         _pollingCts?.Cancel();
         _pollingCts = new CancellationTokenSource();
-        var ct = _pollingCts.Token;
+        _ = PollForReviewAsync(submissionId, _pollingCts.Token);
+    }
 
-        _ = Task.Run(async () =>
+    private async Task PollForReviewAsync(long submissionId, CancellationToken ct)
+    {
+        _polling = true;
+        StateHasChanged();
+
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
+        try
         {
-            await InvokeAsync(() => { _polling = true; StateHasChanged(); });
-
-            while (!ct.IsCancellationRequested)
+            while (await timer.WaitForNextTickAsync(ct))
             {
-                await Task.Delay(3000, ct).ContinueWith(_ => { }); // swallow cancellation
-                if (ct.IsCancellationRequested) break;
-
                 var result = await ReviewService.GetReviewAsync(submissionId, ct);
-
                 if (result.StatusCode == 200 && result.Data is not null)
                 {
-                    await InvokeAsync(() => { _polling = false; ApplyReview(result.Data); StateHasChanged(); });
-                    break;
+                    _polling = false;
+                    ApplyReview(result.Data);
+                    StateHasChanged();
+                    return;
                 }
-
                 if (!result.IsSuccess && result.StatusCode != 204)
                 {
-                    await InvokeAsync(() =>
-                    {
-                        _polling = false;
-                        Snackbar.Add(result.Error ?? "Review polling failed.", Severity.Error);
-                        StateHasChanged();
-                    });
-                    break;
+                    _polling = false;
+                    Snackbar.Add(result.Error ?? "Review polling failed.", Severity.Error);
+                    StateHasChanged();
+                    return;
                 }
             }
-
-            await InvokeAsync(() => { _polling = false; StateHasChanged(); });
-        }, ct);
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            _polling = false;
+            StateHasChanged();
+        }
     }
 
     private void ApplyReview(ReviewResponse review)

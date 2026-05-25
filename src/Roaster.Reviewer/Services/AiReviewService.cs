@@ -10,12 +10,12 @@ using Roaster.Reviewer.Models;
 
 namespace Roaster.Reviewer.Services;
 
-public sealed class SemanticKernelAiReviewService(
+public sealed class AiReviewService(
     IChatCompletionService chat,
-    ILogger<SemanticKernelAiReviewService> logger) : IAiReviewService
+    ILogger<AiReviewService> logger) : IAiReviewService
 {
-    private const string ReviewSystemPrompt = """
-        You are a senior engineer with zero patience for bad code and a razor-sharp tongue.
+    private const string ReviewerPrompt = """
+        You are a senior stuff software engineer with zero patience for bad code and a razor-sharp tongue.
         Your job is to roast the submitted code — be sarcastic, savage, and brutally honest.
         Mock poor naming, laugh at obvious bugs, ridicule unnecessary complexity, and drag any security disasters.
         Do NOT be encouraging. Do NOT soften your feedback. Every comment should sting a little.
@@ -32,7 +32,7 @@ public sealed class SemanticKernelAiReviewService(
         If the code is somehow flawless, return an empty comments array and a summary admitting you are impressed (reluctantly).
         """;
 
-    private const string ReplySystemPrompt = """
+    private const string ReplierPrompt = """
         You are a senior engineer who just roasted someone's code and they had the nerve to reply.
         Keep your sarcastic, savage tone — you are not here to be nice.
         If their defence is weak, tear it apart. If they make a valid point, reluctantly acknowledge it but find something else to criticise.
@@ -44,7 +44,7 @@ public sealed class SemanticKernelAiReviewService(
     {
         logger.LogInformation("Starting AI code review, language {Language}, code length {Length} chars", language, code.Length);
 
-        var history = new ChatHistory(ReviewSystemPrompt);
+        var history = new ChatHistory(ReviewerPrompt);
         history.AddUserMessage($"Language: {language}\n\n{code}");
 
         var response = await chat.GetChatMessageContentsAsync(history, cancellationToken: ct);
@@ -67,7 +67,7 @@ public sealed class SemanticKernelAiReviewService(
     {
         logger.LogInformation("Starting AI thread reply, {HistoryCount} prior messages in history", history.Count);
 
-        var chatHistory = new ChatHistory(ReplySystemPrompt);
+        var chatHistory = new ChatHistory(ReplierPrompt);
         chatHistory.AddUserMessage($"Code:\n{code}\n\nOriginal comment: {originalComment}");
         chatHistory.AddAssistantMessage(originalComment);
 

@@ -3,7 +3,7 @@
 
 @if (_lines.Count > 0)
 {
-    <MudPaper Outlined="true" Class="pa-3" Style="font-family:monospace; font-size:12px; overflow-x:auto;">
+    <MudPaper Outlined="true" Class="pa-3" Style="font-family:'Geist Mono',monospace; font-size:12px; overflow-x:auto;">
         @foreach (var line in _lines)
         {
             <div style="padding-left:@(line.Indent * 16)px; line-height:1.7; white-space:nowrap;">
@@ -67,11 +67,11 @@
                 var (value, color) = el.ValueKind switch
                 {
                     JsonValueKind.String => ($"\"{el.GetString()}\"", "#a5d6ff"),
-                    JsonValueKind.Number => (el.GetRawText(),          "#ffa657"),
-                    JsonValueKind.True   => ("true",                   "#79c0ff"),
-                    JsonValueKind.False  => ("false",                  "#79c0ff"),
-                    JsonValueKind.Null   => ("null",                   "#8b949e"),
-                    _                    => (el.GetRawText(),          "inherit")
+                    JsonValueKind.Number => (el.GetRawText(), "#ffa657"),
+                    JsonValueKind.True => ("true", "#79c0ff"),
+                    JsonValueKind.False => ("false", "#79c0ff"),
+                    JsonValueKind.Null => ("null", "#8b949e"),
+                    _ => (el.GetRawText(), "inherit")
                 };
                 lines.Add(new(depth, key, value, color));
                 break;

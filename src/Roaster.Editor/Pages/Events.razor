@@ -6,20 +6,13 @@
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pa-4">
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
         <MudText Typo="Typo.h5">Event Log</MudText>
-        <MudSwitch T="bool" @bind-Value="@_live" @bind-Value:after="OnLiveToggled"
-                   Color="Color.Success" Label="Live" />
+        <MudSwitch T="bool" @bind-Value="@_live" @bind-Value:after="OnLiveToggled" Color="Color.Success" Label="Live" />
     </MudStack>
 
     <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="mb-4">
-        <MudTextField @bind-Value="_sessionIdInput"
-                      Placeholder="Search by Session ID"
-                      Variant="Variant.Outlined"
-                      Margin="Margin.Dense"
-                      FullWidth="true"
-                      Adornment="Adornment.Start"
-                      AdornmentIcon="@Icons.Material.Filled.Search"
-                      Clearable="true"
-                      OnClearButtonClick="ClearSearch" />
+        <MudTextField @bind-Value="_sessionIdInput" Placeholder="Search by Session ID" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" FullWidth="true" Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" OnClearButtonClick="ClearSearch" />
         <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SearchAsync" Disabled="Running">
             Search
         </MudButton>
@@ -82,7 +75,8 @@
                                     </MudItem>
                                     <MudItem xs="12" sm="4">
                                         <MudText Typo="Typo.caption" Color="Color.Secondary">Review Duration</MudText>
-                                        <MudText Typo="Typo.body2">@((ev.ReviewDurationMs!.Value / 1000.0).ToString("F2"))s</MudText>
+                                        <MudText Typo="Typo.body2">@((ev.ReviewDurationMs!.Value / 1000.0).ToString("F2"))s
+                                        </MudText>
                                     </MudItem>
                                     <MudItem xs="12" sm="4">
                                         <MudText Typo="Typo.caption" Color="Color.Secondary">Total Duration</MudText>
@@ -107,7 +101,8 @@
         <MudStack Row="true" Justify="Justify.Center" AlignItems="AlignItems.Center" Spacing="2" Class="mt-4">
             <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Disabled="_page <= 1 || _live" OnClick="PrevPage" />
             <MudText Typo="Typo.body2">Page @_page</MudText>
-            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Disabled="_events.Count < PageSize || _live" OnClick="NextPage" />
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Disabled="_events.Count < PageSize || _live"
+                           OnClick="NextPage" />
         </MudStack>
     }
 </MudContainer>
@@ -209,12 +204,12 @@
 
     private static Color GetEventColor(string eventType) => eventType switch
     {
-        "Submitted"         => Color.Info,
+        "Submitted" => Color.Info,
         "ProcessingStarted" => Color.Warning,
-        "ReviewCompleted"   => Color.Success,
-        "Failed"            => Color.Error,
-        "UserReplied"       => Color.Primary,
-        "AiReplied"         => Color.Secondary,
-        _                   => Color.Default
+        "ReviewCompleted" => Color.Success,
+        "Failed" => Color.Error,
+        "UserReplied" => Color.Primary,
+        "AiReplied" => Color.Secondary,
+        _ => Color.Default
     };
 }

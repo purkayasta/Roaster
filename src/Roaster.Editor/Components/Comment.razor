@@ -107,7 +107,7 @@
     protected override async Task OnInitializedAsync()
     {
         _isResolved = CommentData.IsResolved;
-        _collapsed  = _isResolved;
+        _collapsed = _isResolved;
         if (CommentData.ThreadId is not { } threadId) return;
 
         _threadId = threadId;
@@ -203,7 +203,7 @@
             if (result.IsSuccess)
             {
                 _isResolved = true;
-                _collapsed  = true;
+                _collapsed = true;
                 _pendingResize = true;
             }
             else

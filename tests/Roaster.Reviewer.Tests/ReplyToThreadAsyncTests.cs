@@ -16,9 +16,9 @@ namespace Roaster.Reviewer.Tests;
 
 public sealed class ReplyToThreadAsyncTests
 {
-    private static SemanticKernelAiReviewService BuildService(
+    private static AiReviewService BuildService(
         Mock<IChatCompletionService> chatMock)
-        => new(chatMock.Object, NullLogger<SemanticKernelAiReviewService>.Instance);
+        => new(chatMock.Object, NullLogger<AiReviewService>.Instance);
 
     private static void SetupChatReply(Mock<IChatCompletionService> mock, string reply)
     {

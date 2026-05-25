@@ -78,6 +78,7 @@
     [Parameter, EditorRequired] public long ReviewId { get; set; }
     [Parameter, EditorRequired] public ReviewCommentResponse CommentData { get; set; } = null!;
     [Parameter] public EventCallback OnZoneResize { get; set; }
+    [Parameter] public EventCallback OnResolved { get; set; }
 
     private List<ThreadReplyResponse> _replies = [];
     private string _replyText = string.Empty;
@@ -205,6 +206,7 @@
                 _isResolved = true;
                 _collapsed = true;
                 _pendingResize = true;
+                await OnResolved.InvokeAsync();
             }
             else
             {

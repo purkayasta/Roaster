@@ -53,7 +53,8 @@
                     <div @key="comment.LineNumber" @ref="_commentRefs[comment.LineNumber]" data-line="@comment.LineNumber"
                          style="position:absolute; left:0; right:0; pointer-events:auto;">
                         <Comment SubmissionId="_submissionId!.Value" ReviewId="_review.Id" CommentData="comment"
-                                 OnZoneResize="() => ResizeZoneAsync(comment.LineNumber)" />
+                                 OnZoneResize="() => ResizeZoneAsync(comment.LineNumber)"
+                                 OnResolved="OnCommentResolved" />
                     </div>
                 }
             </div>
@@ -66,6 +67,7 @@
     [Parameter] public long? SubmissionId { get; set; }
     [Parameter] public string? Content { get; set; }
     [Parameter] public string? Language { get; set; }
+    [Parameter] public EventCallback OnCommentResolved { get; set; }
 
     private StandaloneCodeEditor _editor = null!;
     private string _language = CodeUtils.DefaultLanguage;
@@ -131,6 +133,7 @@
         LineNumbers = "on",
         FontSize = 14,
         GlyphMargin = true,
+        FontFamily = "'Geist Mono', 'Cascadia Code', 'Fira Code', monospace",
     };
 
     private async Task OnLanguageChangedAsync(string language) =>

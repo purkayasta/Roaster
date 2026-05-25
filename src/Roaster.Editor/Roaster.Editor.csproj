@@ -13,6 +13,11 @@
     <WasmFingerprintAssets>false</WasmFingerprintAssets>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimmerRootDescriptor>trimmer.xml</TrimmerRootDescriptor>
+  </PropertyGroup>
+
   <ItemGroup>
     <EmbeddedResource Include="Resources/NordDark.json" />
   </ItemGroup>

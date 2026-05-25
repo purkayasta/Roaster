@@ -27,7 +27,7 @@ public sealed class AiReviewService(
             { "lineNumber": 5, "comment": "Your savage comment about this specific line.", "severity": 20 }
           ]
         }
-        Severity values: 10 = Gentle (mild style crimes), 20 = Medium (this is genuinely bad), 30 = Brutal (how is this in production?).
+        Severity values: 10 = Medium (this is genuinely bad), 20 = Brutal (how is this in production?).
         Pick severity based on how bad the sin actually is — don't let anything off easy.
         If the code is somehow flawless, return an empty comments array and a summary admitting you are impressed (reluctantly).
         """;

@@ -3,7 +3,9 @@
 //  Copyright (c) Pritom Purkayasta All rights reserved.
 //  FREE TO USE TO CONNECT THE WORLD
 /// </summary>
+using System.IO.Compression;
 using MassTransit;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using RabbitMQ.Client;
 using Roaster.Api.Endpoints;
@@ -42,6 +44,15 @@ builder.Services.AddHealthChecks()
         return factory.CreateConnectionAsync();
     });
 
+builder.Services.AddResponseCompression(opts =>
+{
+    opts.EnableForHttps = true;
+    opts.Providers.Add<BrotliCompressionProvider>();
+    opts.Providers.Add<GzipCompressionProvider>();
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(opts => opts.Level = CompressionLevel.Fastest);
+builder.Services.Configure<GzipCompressionProviderOptions>(opts => opts.Level = CompressionLevel.Fastest);
+
 builder.Services.AddOpenApi();
 builder.Services.AddScoped<Roaster.Api.Services.SessionService>();
 builder.Services.AddScoped<Roaster.Api.Services.SubmissionService>();
@@ -51,6 +62,7 @@ builder.Services.AddScoped<Roaster.Api.Services.EventService>();
 builder.Services.AddValidation();
 
 var app = builder.Build();
+app.UseResponseCompression();
 app.UseCors();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseSerilogRequestLogging();

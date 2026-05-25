@@ -32,7 +32,7 @@ docker run -d --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgre
 docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:4-management-alpine
 # Ollama (needed by Consumer)
 ollama serve   # or run as a service; default port 11434
-ollama pull phi4-mini:latest
+ollama pull qwen2.5-coder:3b
 ```
 
 ### 2. Database Migrations

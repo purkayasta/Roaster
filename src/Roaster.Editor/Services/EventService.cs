@@ -1,8 +1,13 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 using Roaster.Editor.Services.Models;
 
 namespace Roaster.Editor.Services;
 
-public class EventService(HttpClient client)
+public sealed class EventService(HttpClient client)
 {
     public async Task<ApiResponse<List<EventLogResponse>>> GetAllAsync(
         int page = 1, int pageSize = 30, Guid? sessionId = null, CancellationToken ct = default)

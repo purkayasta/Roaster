@@ -1,3 +1,8 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 namespace Roaster.Data.Models;
 
 public sealed class Submission
@@ -11,7 +16,5 @@ public sealed class Submission
 
     public Session Session { get; set; } = null!;
     public Review? Review { get; set; }
-    public ReviewMetrics? Metrics { get; set; }
     public ICollection<Event> Events { get; set; } = [];
-    public ICollection<SubmissionHistory> History { get; set; } = [];
 }

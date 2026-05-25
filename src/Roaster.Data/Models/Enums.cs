@@ -1,3 +1,8 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 namespace Roaster.Data.Models;
 
 public enum SubmissionStatus
@@ -13,6 +18,12 @@ public enum ReviewSeverity
     Gentle = 10,
     Medium = 20,
     Brutal = 30
+}
+
+public enum ThreadStatus
+{
+    Unresolved = 10,
+    Resolved   = 20
 }
 
 public enum EventType

@@ -3,16 +3,33 @@
 @implements IAsyncDisposable
 
 <div class="roaster-review-comment" style="max-width:580px;">
-    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="0" Style="padding:4px 6px;">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="0"
+              Style="padding:4px 6px;">
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
             <MudChip T="string" Size="Size.Small" Color="CodeUtils.GetSeverityColor(CommentData.Severity)"
                      Variant="Variant.Filled" Class="roaster-severity-chip">
                 @CommentData.Severity
             </MudChip>
             <MudText Typo="Typo.caption" Style="opacity:0.7;">Line @CommentData.LineNumber</MudText>
+            @if (_isResolved)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined"
+                         Class="roaster-severity-chip">
+                    Resolved
+                </MudChip>
+            }
         </MudStack>
-        <MudIconButton Icon="@(_collapsed ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ExpandLess)"
-                       Size="Size.Small" Style="padding:2px;" OnClick="ToggleCollapse" />
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="0">
+            @if (!_isResolved && _threadId is not null)
+            {
+                <MudButton Size="Size.Small" Color="Color.Success" Variant="Variant.Text" Disabled="Running"
+                           OnClick="ResolveAsync" Style="min-width:0; padding:2px 6px; font-size:11px;">
+                    Resolve
+                </MudButton>
+            }
+            <MudIconButton Icon="@(_collapsed ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ExpandLess)"
+                           Size="Size.Small" Style="padding:2px;" OnClick="ToggleCollapse" />
+        </MudStack>
     </MudStack>
 
     @if (!_collapsed)
@@ -47,18 +64,10 @@
 
             <MudDivider Class="my-2" />
             <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
-                <MudTextField @bind-Value="_replyText"
-                              Placeholder="Reply..."
-                              Variant="Variant.Outlined"
-                              Margin="Margin.Dense"
-                              Lines="1"
-                              FullWidth="true"
-                              Disabled="Running" />
-                <MudIconButton Icon="@Icons.Material.Filled.Send"
-                               Color="Color.Primary"
-                               Size="Size.Small"
-                               Disabled="@(Running || string.IsNullOrWhiteSpace(_replyText))"
-                               OnClick="SendReplyAsync" />
+                <MudTextField @bind-Value="_replyText" Placeholder="Reply..." Variant="Variant.Outlined"
+                              Margin="Margin.Dense" Lines="1" FullWidth="true" Disabled="Running" />
+                <MudIconButton Icon="@Icons.Material.Filled.Send" Color="Color.Primary" Size="Size.Small"
+                               Disabled="@(Running || string.IsNullOrWhiteSpace(_replyText))" OnClick="SendReplyAsync" />
             </MudStack>
         </div>
     }
@@ -75,6 +84,7 @@
     private long? _threadId;
     private bool _waitingForAi;
     private bool _collapsed;
+    private bool _isResolved;
     private CancellationTokenSource? _aiPollCts;
 
     private bool _pendingResize;
@@ -96,6 +106,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        _isResolved = CommentData.IsResolved;
         if (CommentData.ThreadId is not { } threadId) return;
 
         _threadId = threadId;
@@ -182,6 +193,19 @@
 
             await InvokeAsync(() => { _waitingForAi = false; StateHasChanged(); });
         }, ct);
+    }
+
+    private async Task ResolveAsync()
+    {
+        if (_threadId is not { } threadId) return;
+        await RunLogException(async () =>
+        {
+            var result = await ReviewService.ResolveAsync(threadId);
+            if (result.IsSuccess)
+                _isResolved = true;
+            else
+                Snackbar.Add(result.Error ?? $"Failed to resolve ({result.StatusCode}).", Severity.Error);
+        });
     }
 
     public ValueTask DisposeAsync()

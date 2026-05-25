@@ -1,7 +1,13 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
-using Roaster.Consumer.Consumers;
+using Roaster.Consumer.Processors;
+using Roaster.Consumer.Services;
 using Roaster.Data.Context;
 using Roaster.Reviewer;
 using Roaster.Reviewer.Options;
@@ -18,10 +24,13 @@ builder.Services.AddDbContext<RoasterDbContext>(opts =>
 builder.Services.Configure<OllamaOptions>(builder.Configuration.GetSection("Ollama"));
 builder.Services.AddAiReviewer();
 
+builder.Services.AddScoped<CodeReviewService>();
+builder.Services.AddScoped<ThreadReplyService>();
+
 builder.Services.AddMassTransit(x =>
 {
-    x.AddConsumer<CodeSubmittedConsumer>();
-    x.AddConsumer<UserThreadReplyConsumer>();
+    x.AddConsumer<ReviewProcessor>();
+    x.AddConsumer<ReplyProcessor>();
 
     x.UsingRabbitMq((ctx, cfg) =>
     {
@@ -31,7 +40,7 @@ builder.Services.AddMassTransit(x =>
         {
             e.PrefetchCount = 1;
             e.ConcurrentMessageLimit = 1;
-            e.ConfigureConsumer<CodeSubmittedConsumer>(ctx);
+            e.ConfigureConsumer<ReviewProcessor>(ctx);
             e.UseMessageRetry(r => r.Exponential(3,
                 TimeSpan.FromSeconds(10),
                 TimeSpan.FromSeconds(120),
@@ -40,7 +49,7 @@ builder.Services.AddMassTransit(x =>
 
         cfg.ReceiveEndpoint("user-thread-reply", e =>
         {
-            e.ConfigureConsumer<UserThreadReplyConsumer>(ctx);
+            e.ConfigureConsumer<ReplyProcessor>(ctx);
             e.UseMessageRetry(r => r.Intervals(
                 TimeSpan.FromSeconds(3),
                 TimeSpan.FromSeconds(10),

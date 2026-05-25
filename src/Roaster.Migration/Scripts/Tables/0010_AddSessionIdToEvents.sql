@@ -1,2 +1,0 @@
-ALTER TABLE "Events"
-    ADD COLUMN IF NOT EXISTS "SessionId" uuid NULL;

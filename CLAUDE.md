@@ -56,7 +56,7 @@ make down           # tear down
 1. `make up` — start full stack in Docker (DB + RabbitMQ + migration + API + consumer + frontend)
 2. Or for local hot-reload: `make api` + `make consumer` + `make editor` (requires Docker infra already running)
 
-All Docker images use alpine variants for minimal size. Ollama model is configured via `OLLAMA_MODEL` env var (default: `phi4-mini:latest`).
+All Docker images use alpine variants for minimal size. Ollama model is configured via `OLLAMA_MODEL` env var (default: `qwen2.5-coder:3b`).
 
 ---
 
@@ -66,11 +66,11 @@ All Docker images use alpine variants for minimal size. Ollama model is configur
 
 **Thread replies:** User posts to `/api/submissions/{subId}/reviews/{revId}/lines/{lineNum}/threads` → `UserThreadReplyConsumer` builds chat history → AI reply saved → `GET /api/threads/{threadId}/replies` returns conversation.
 
-**Key tech:** ASP.NET Core 10 (Minimal APIs) · EF Core 10 + Npgsql (Postgres 17-alpine) · MassTransit 8 + RabbitMQ · Semantic Kernel 1.74.0 + Ollama (`phi4-mini:latest`) · Blazor WASM 10 · MudBlazor 9.4 · BlazorMonaco 3.4 · DbUp 7.
+**Key tech:** ASP.NET Core 10 (Minimal APIs) · EF Core 10 + Npgsql (Postgres 17-alpine) · MassTransit 8 + RabbitMQ · Semantic Kernel 1.74.0 + Ollama (`qwen2.5-coder:3b`) · Blazor WASM 10 · MudBlazor 9.4 · BlazorMonaco 3.4 · DbUp 7.
 
 **JSONB columns:** `Submission.Payload` (code + language), `Review.Comments` (line comments array), `Event.Metadata`.
 
-**1:1 Session ↔ Submission.** Each session has at most one live submission. Resubmitting replaces the payload, deletes the existing review, and auto-captures the old payload in `SubmissionHistory`.
+**1:1 Session ↔ Submission.** Each session has at most one live submission. The API always returns the latest submission for a session.
 
 **Soft delete.** Sessions are soft-deleted via `IsActive = false`. All list queries filter `IsActive = true`.
 
@@ -80,6 +80,8 @@ All Docker images use alpine variants for minimal size. Ollama model is configur
 
 **Frontend:** Dashboard (`/`) lists sessions via `SessionView` (`MudDataGrid`). "New" button opens `NewSessionDialog`, calls `POST /api/sessions`, navigates to `/session/{id}`. All action handlers (new/edit/delete) live in `Index.razor`; child components emit `EventCallback<Guid>` only. `Session.razor` loads session detail and renders the Monaco editor (`Code.razor`) with language + theme dropdowns. Custom themes (e.g. Nord Dark) are JSON `EmbeddedResource` files registered by `ThemeFactory` once per app session.
 
-**Services:** `SessionService` owns all session API calls. `SubmissionService` is a registered placeholder for future submission calls. Both are typed `HttpClient` clients registered in `Program.cs`.
+**Frontend services:** `SessionService`, `SubmissionService`, and `ReviewService` are typed `HttpClient` clients registered in `Program.cs`. `ReviewService` also handles thread replies and resolve.
+
+**Backend services:** `Roaster.Api` has a `Services/` folder with one service per resource. All business logic lives there; endpoints are thin wrappers that return `ServiceResult<T>` directly (it implements `IResult`).
 
 **Tests:** xUnit + Moq + FluentAssertions. Api tests use `WebApplicationFactory` + EF InMemory + mocked `IPublishEndpoint`. Consumer tests use `FakeConsumeContext`. No real broker or database needed for tests.

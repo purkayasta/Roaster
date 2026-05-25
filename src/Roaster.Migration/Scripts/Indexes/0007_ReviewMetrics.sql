@@ -1,1 +1,1 @@
-CREATE INDEX idx_review_metrics_submission ON "ReviewMetrics"("SubmissionId");
+CREATE INDEX idx_review_metrics_review ON "ReviewMetrics"("ReviewId");

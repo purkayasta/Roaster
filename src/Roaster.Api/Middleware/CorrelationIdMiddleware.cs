@@ -1,8 +1,13 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 using Serilog.Context;
 
 namespace Roaster.Api.Middleware;
 
-public class CorrelationIdMiddleware(RequestDelegate next)
+public sealed class CorrelationIdMiddleware(RequestDelegate next)
 {
     public async Task Invoke(HttpContext ctx)
     {

@@ -59,9 +59,14 @@ services:
         Host=postgres;Database=roaster;Username=roaster;Password=${POSTGRES_PASSWORD:-changeme}
       RabbitMQ__Uri: "rabbitmq://guest:${RABBITMQ_PASSWORD:-guest}@rabbitmq"
       Ollama__Endpoint: "http://host.docker.internal:11434"
-      Ollama__ModelId: ${OLLAMA_MODEL:-phi4-mini:latest}
+      Ollama__ModelId: ${OLLAMA_MODEL:-qwen2.5-coder:3b}
     networks:
       - roaster-net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   roaster-api:
@@ -80,6 +85,10 @@ services:
     depends_on:
       roaster-consumer:
         condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
       interval: 15s
@@ -95,6 +104,9 @@ services:
       - "5094:80"
     networks:
       - roaster-net
+    depends_on:
+      roaster-api:
+        condition: service_started
     restart: unless-stopped
 
 networks:

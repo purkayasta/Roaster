@@ -1,9 +1,14 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 using System.Net.Http.Json;
 using Roaster.Editor.Services.Models;
 
 namespace Roaster.Editor.Services;
 
-public class SessionService(HttpClient client)
+public sealed class SessionService(HttpClient client)
 {
     public async Task<ApiResponse<List<SessionSubmissionResponse>>> GetAllAsync(int page = 1, int pageSize = 20, CancellationToken ct = default)
     {

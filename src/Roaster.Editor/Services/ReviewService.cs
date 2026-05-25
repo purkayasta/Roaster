@@ -1,9 +1,14 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 using System.Net.Http.Json;
 using Roaster.Editor.Services.Models;
 
 namespace Roaster.Editor.Services;
 
-public class ReviewService(HttpClient client)
+public sealed class ReviewService(HttpClient client)
 {
     public async Task<ApiResponse<ReviewResponse>> GetReviewAsync(long submissionId, CancellationToken ct = default)
     {
@@ -23,5 +28,11 @@ public class ReviewService(HttpClient client)
     {
         var response = await client.GetAsync($"/api/threads/{threadId}/replies", ct);
         return await ApiResponse<List<ThreadReplyResponse>>.FromAsync(response);
+    }
+
+    public async Task<ApiResponse<object?>> ResolveAsync(long threadId, CancellationToken ct = default)
+    {
+        var response = await client.PatchAsync($"/api/threads/{threadId}/resolve", null, ct);
+        return await ApiResponse<object?>.FromAsync(response);
     }
 }

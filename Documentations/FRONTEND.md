@@ -49,7 +49,7 @@ src/Roaster.Editor/
         ├── SessionDetailResponse.cs     # record(Id, Name, CreatedAt, CodeContent?, Language?, Status?, SubmissionId?)
         ├── SessionResponse.cs           # record(Id, Name, CreatedAt) — returned from POST /api/sessions
         ├── SubmissionResponse.cs        # record(Id, Language?, Status, CreatedAt, UpdatedAt)
-        └── ReviewResponse.cs            # ReviewResponse, ReviewCommentResponse, ThreadReplyResponse, ThreadCreatedResponse
+        └── ReviewResponse.cs            # ReviewResponse, ReviewCommentResponse(+IsResolved), ThreadReplyResponse, ThreadCreatedResponse
 ```
 
 ---
@@ -80,7 +80,7 @@ Route: `/session/{Id}` and `/session/` (no id).
 
 - On params set: parses `Id` as Guid, calls `SessionService.GetByIdAsync`.
 - Shows session name + UUID caption + status chip (color-coded).
-- Renders `<Code SessionId SubmissionId Content Language />`. `SubmissionId` is populated from `SessionDetailResponse` and drives initial review load.
+- Renders `<Code SessionId SubmissionId Content Language />`. `SubmissionId` and `CodeContent` come directly from `SessionDetailResponse` (always the latest submission).
 - Uses a flex layout (`height:100%; display:flex; flex-direction:column`) so the editor fills the viewport without page scroll.
 - `StatusColor`: `"Completed"` → Success, `"Processing"` → Warning, `"Failed"` → Error.
 
@@ -128,10 +128,11 @@ Inherits `EditorComponentBase`. Renders inside the overlay div positioned over M
 Parameters (`EditorRequired`): `SubmissionId (long)`, `ReviewId (long)`, `CommentData (ReviewCommentResponse)`, `OnZoneResize (EventCallback)`.
 
 - Max width: `580px`.
-- Has a collapse/expand toggle button (chevron icon) in the header. When collapsed, the body (comment text, replies, reply box) is hidden.
+- Header shows: severity chip, line number, a green **Resolve** button (visible only when a thread exists and is not yet resolved), and a collapse/expand chevron.
+- Resolving calls `ReviewService.ResolveAsync(threadId)` → `PATCH /api/threads/{id}/resolve`. On success, the Resolve button is replaced by a green "Resolved" chip — no page reload needed.
 - Collapse toggle uses `_pendingResize` + `OnAfterRenderAsync` pattern: `ToggleCollapse()` sets `_pendingResize = true` synchronously; `OnAfterRenderAsync` fires `OnZoneResize` only after Blazor has re-rendered the DOM so `scrollHeight` reflects the new state.
-- On init: if `CommentData.ThreadId` is set, loads existing replies via `ReviewService.GetRepliesAsync`.
-- **Send:** posts reply via `ReviewService.PostReplyAsync`, captures returned `threadId` so subsequent replies reload correctly even when the thread was just created.
+- On init: reads `CommentData.IsResolved` into `_isResolved`; if `CommentData.ThreadId` is set, loads existing replies via `ReviewService.GetRepliesAsync`.
+- **Send:** posts reply via `ReviewService.AddReplyAsync`, captures returned `threadId` so subsequent replies reload correctly even when the thread was just created.
 - Calls `OnZoneResize` after replies change so `Code.razor` can call `RoasterReview.updateZoneHeight` + `syncOverlay`.
 - Uses `Running` from base class for button disabled state.
 
@@ -161,10 +162,10 @@ Wraps every HTTP response. Built via the static `FromAsync(HttpResponseMessage)`
 
 ### `SessionService`
 ```
-GetAllAsync(page, pageSize, ct)   → GET /api/sessions?page=&pageSize=   → ApiResponse<List<SessionSubmissionResponse>>
-GetByIdAsync(sessionId, ct)       → GET /api/sessions/{id}              → ApiResponse<SessionDetailResponse>
-CreateAsync(name, ct)             → POST /api/sessions                  → ApiResponse<SessionResponse>
-DeleteAsync(sessionId, ct)        → DELETE /api/sessions/{id}           → ApiResponse<object?>
+GetAllAsync(page, pageSize, ct)  → GET /api/sessions?page=&pageSize=  → ApiResponse<List<SessionSubmissionResponse>>
+GetByIdAsync(sessionId, ct)      → GET /api/sessions/{id}             → ApiResponse<SessionDetailResponse>
+CreateAsync(name, ct)            → POST /api/sessions                 → ApiResponse<SessionResponse>
+DeleteAsync(sessionId, ct)       → DELETE /api/sessions/{id}          → ApiResponse<object?>
 ```
 
 ### `SubmissionService`
@@ -186,6 +187,10 @@ PostReplyAsync(submissionId, reviewId, lineNumber, content, ct)
 GetRepliesAsync(threadId, ct)
   → GET /api/threads/{threadId}/replies
   → ApiResponse<List<ThreadReplyResponse>>
+
+ResolveAsync(threadId, ct)
+  → PATCH /api/threads/{threadId}/resolve
+  → ApiResponse<object?>   (204 on success)
 ```
 
 ### `CodeUtils`

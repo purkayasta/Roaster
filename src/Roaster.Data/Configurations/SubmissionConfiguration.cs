@@ -1,10 +1,15 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Roaster.Data.Models;
 
 namespace Roaster.Data.Configurations;
 
-public class SubmissionConfiguration : IEntityTypeConfiguration<Submission>
+public sealed class SubmissionConfiguration : IEntityTypeConfiguration<Submission>
 {
     public void Configure(EntityTypeBuilder<Submission> builder)
     {
@@ -12,7 +17,12 @@ public class SubmissionConfiguration : IEntityTypeConfiguration<Submission>
         builder.Property(s => s.Id).UseIdentityByDefaultColumn();
 
         builder.Property(s => s.SessionId).IsRequired();
-        builder.HasIndex(s => s.SessionId).IsUnique();
+        builder.HasIndex(s => s.SessionId);
+
+        builder.HasOne(s => s.Session)
+               .WithMany(ses => ses.Submissions)
+               .HasForeignKey(s => s.SessionId)
+               .OnDelete(DeleteBehavior.Cascade);
 
         builder.OwnsOne(s => s.Payload, b => b.ToJson("Payload"));
 
@@ -25,19 +35,9 @@ public class SubmissionConfiguration : IEntityTypeConfiguration<Submission>
                .HasForeignKey<Review>(r => r.SubmissionId)
                .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasOne(s => s.Metrics)
-               .WithOne(m => m.Submission)
-               .HasForeignKey<ReviewMetrics>(m => m.SubmissionId)
-               .OnDelete(DeleteBehavior.Cascade);
-
         builder.HasMany(s => s.Events)
                .WithOne(e => e.Submission)
                .HasForeignKey(e => e.SubmissionId)
-               .OnDelete(DeleteBehavior.Cascade);
-
-        builder.HasMany(s => s.History)
-               .WithOne(h => h.Submission)
-               .HasForeignKey(h => h.SubmissionId)
                .OnDelete(DeleteBehavior.Cascade);
 
         builder.ToTable("Submissions");

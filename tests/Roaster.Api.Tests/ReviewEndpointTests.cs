@@ -1,3 +1,8 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
@@ -8,7 +13,7 @@ using Roaster.Data.Models;
 
 namespace Roaster.Api.Tests;
 
-public class ReviewEndpointTests(ApiFactory factory) : IClassFixture<ApiFactory>
+public sealed class ReviewEndpointTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
     private HttpClient Client => factory.CreateClient();
 

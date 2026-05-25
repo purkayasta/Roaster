@@ -1,3 +1,8 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Roaster.Data.Context;
@@ -5,7 +10,7 @@ using Roaster.Data.Models;
 
 namespace Roaster.Data.Tests;
 
-public class EfConfigurationTests
+public sealed class EfConfigurationTests
 {
     private static RoasterDbContext BuildDb() =>
         new(new DbContextOptionsBuilder<RoasterDbContext>()

@@ -4,7 +4,7 @@
 
 | Project | SDK | Role |
 |---|---|---|
-| **Roaster.Api** | Web | HTTP endpoints, validation, middleware, publishes events |
+| **Roaster.Api** | Web | HTTP endpoints, service layer, validation, middleware, publishes events |
 | **Roaster.Consumer** | Worker | Consumes RabbitMQ messages, orchestrates review flow |
 | **Roaster.Reviewer** | Class Library | `IAiReviewService` — Semantic Kernel 1.74.0 + Ollama connector (alpha) |
 | **Roaster.Data** | Class Library | EF Core `RoasterDbContext`, entity configs, no migrations |
@@ -67,7 +67,7 @@ GET /api/submissions/{id}/review
 POST /api/submissions/{subId}/reviews/{revId}/lines/{lineNum}/threads
   → Creates CommentThread + ThreadReply (IsAiReply=false)
   → Logs Event(UserReplied)
-  → Publishes UserThreadReplyEvent
+  → Publishes ReplyEvent
 
 RabbitMQ: user-thread-reply queue
   → UserThreadReplyConsumer builds full chat history from prior replies
@@ -77,6 +77,10 @@ RabbitMQ: user-thread-reply queue
 
 GET /api/threads/{threadId}/replies
   → Returns ordered conversation (user/AI alternating)
+
+PATCH /api/threads/{threadId}/resolve
+  → Sets CommentThread.Status = Resolved (smallint 20)
+  → 204 No Content; 404 if thread not found
 ```
 
 ---
@@ -92,7 +96,8 @@ GET /api/threads/{threadId}/replies
 | POST | `/api/submissions` | 202 `SubmissionDto` | Submit/resubmit code |
 | GET | `/api/submissions/{id}` | 200 `SubmissionDto` | Single submission |
 | GET | `/api/submissions/{id}/review` | 204 / 200 `ReviewDto` | Poll until completed |
-| POST | `/api/submissions/{subId}/reviews/{revId}/lines/{lineNum}/threads` | 201 | User reply |
+| POST | `/api/submissions/{subId}/reviews/{revId}/lines/{lineNum}/threads` | 202 `ThreadCreatedDto` | User reply — creates thread if needed |
+| PATCH | `/api/threads/{threadId}/resolve` | 204 | Mark thread as resolved |
 | GET | `/api/threads/{threadId}/replies` | 200 `ThreadReplyDto[]` | Conversation |
 | GET | `/health` | 200 / 503 | Postgres + RabbitMQ health |
 
@@ -109,16 +114,18 @@ OpenAPI/Scalar UI: `/scalar/v1` (development only).
 | `Session` | UUID | `Name varchar(255)`, `CreatedAt`, `IsActive bool` | Soft delete via `IsActive`; one session → one submission |
 | `Submission` | bigserial | `SessionId UUID (unique FK)`, `Payload JSONB`, `Status smallint` | Unique on SessionId |
 | `Review` | bigserial | `SubmissionId FK`, `Summary text`, `Comments JSONB` | Created by consumer |
-| `CommentThread` | bigserial | `ReviewId FK`, `LineNumber int` | Unique (ReviewId, LineNumber) |
+| `CommentThread` | bigserial | `ReviewId FK`, `LineNumber int`, `Status smallint` | Unique (ReviewId, LineNumber); default Status=Unresolved |
 | `ThreadReply` | bigserial | `ThreadId FK`, `Content text`, `IsAiReply bool` | User and AI messages |
 | `Event` | bigserial | `SubmissionId FK`, `SessionId UUID`, `EventType smallint`, `CorrelationId UUID`, `Metadata JSONB` | Audit log |
-| `SubmissionHistory` | bigserial | `SubmissionId FK`, `SessionId FK`, `Payload JSONB`, `ChangedAt` | Auto-captured on payload change |
 | `ReviewMetrics` | bigserial | `SubmissionId FK`, `ModelId varchar(100)`, timing/count ints | Performance data |
 
 ### Enum Values
 
 **SubmissionStatus** (stored as smallint):
 - 10 = Submitted, 20 = Processing, 30 = Completed, 40 = Failed
+
+**ThreadStatus** (stored as smallint):
+- 10 = Unresolved (default), 20 = Resolved
 
 **ReviewSeverity** (stored as smallint):
 - 10 = Gentle, 20 = Medium, 30 = Brutal
@@ -130,6 +137,8 @@ OpenAPI/Scalar UI: `/scalar/v1` (development only).
 
 ## Key Patterns
 
+**Service layer.** `Roaster.Api` has a `Services/` folder with one service per resource (`SessionService`, `SubmissionService`, `ReviewService`, `ThreadService`, `EventService`). All business logic and DB access lives in the services. Endpoints are thin — they call one service method and return the result directly. Services return `ServiceResult<T>` (or non-generic `ServiceResult` for void operations), which implements `IResult` so endpoints can `return await service.XxxAsync(...)` without any manual status mapping. The only exception is endpoints that need a custom HTTP response code (e.g. `AcceptedAtRoute`) — they check `result.Status` once before overriding.
+
 **JSONB owned types.**
 - `Submission.Payload` → `CodePayload { Content, Language }` — single JSONB column
 - `Review.Comments` → `List<ReviewLineComment>` — JSONB array
@@ -137,11 +146,9 @@ OpenAPI/Scalar UI: `/scalar/v1` (development only).
 
 **Session soft delete.** `Session.IsActive` defaults to `true`. `DELETE /api/sessions/{id}` sets it `false`. All `GET /api/sessions` queries filter `IsActive = true`.
 
-**Session ↔ Submission (1:1).** `SessionId` on `Submission` has a unique constraint. Each session has at most one live submission. Resubmitting replaces the payload and deletes the existing `Review` (if any); the old payload is preserved in `SubmissionHistory`.
+**Session ↔ Submission (1:1).** `SessionId` on `Submission` has a unique constraint. Each session has at most one live submission. The API always returns the latest submission for a session.
 
 **Dashboard query direction.** `GET /api/sessions` queries from `Sessions` and LEFT JOINs `Submission`, so sessions without any submission appear in the list with null Language/Status/SubmissionId.
-
-**SubmissionHistory auto-capture.** `RoasterDbContext.SaveChangesAsync` detects modified `Submission.Payload` and writes a `SubmissionHistory` row automatically, without callers needing to do it.
 
 **CorrelationId in Events = SessionId.** The `CorrelationId` stored in `Event` rows is the Session's UUID, not the HTTP-header UUID. The `CorrelationIdMiddleware` UUID only flows into Serilog context and the `X-Correlation-Id` response header.
 
@@ -170,7 +177,7 @@ OpenAPI/Scalar UI: `/scalar/v1` (development only).
 {
   "ConnectionStrings": { "Postgres": "..." },
   "RabbitMQ": { "Uri": "..." },
-  "Ollama": { "Endpoint": "http://localhost:11434", "ModelId": "phi4-mini:latest" }
+  "Ollama": { "Endpoint": "http://localhost:11434", "ModelId": "qwen2.5-coder:3b" }
 }
 ```
 

@@ -1,27 +1,34 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 using FluentAssertions;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
-using Roaster.Consumer.Consumers;
+using Roaster.Consumer.Processors;
+using Roaster.Consumer.Services;
 using Roaster.Consumer.Tests.Helpers;
 using Roaster.Contracts.Events;
 using Roaster.Data.Context;
 using Roaster.Data.Models;
 using Roaster.Reviewer.Abstractions;
+using Roaster.Reviewer.Models;
 using Roaster.Reviewer.Options;
 
 namespace Roaster.Consumer.Tests;
 
-public class CodeSubmittedConsumerTests : IDisposable
+public sealed class ReviewProcessorTests : IDisposable
 {
     private readonly RoasterDbContext _db;
     private readonly Mock<IPublishEndpoint> _publisher;
     private readonly Mock<IAiReviewService> _ai;
-    private readonly CodeSubmittedConsumer _consumer;
+    private readonly ReviewProcessor _consumer;
 
-    public CodeSubmittedConsumerTests()
+    public ReviewProcessorTests()
     {
         var options = new DbContextOptionsBuilder<RoasterDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
@@ -31,8 +38,9 @@ public class CodeSubmittedConsumerTests : IDisposable
         _ai = new Mock<IAiReviewService>();
 
         var ollamaOpts = Options.Create(new OllamaOptions { Endpoint = "http://localhost:11434", ModelId = "test-model" });
-        _consumer = new CodeSubmittedConsumer(_db, _publisher.Object, _ai.Object, ollamaOpts,
-            NullLogger<CodeSubmittedConsumer>.Instance);
+        var service = new CodeReviewService(_db, _publisher.Object, _ai.Object, ollamaOpts,
+            NullLogger<CodeReviewService>.Instance);
+        _consumer = new ReviewProcessor(service);
     }
 
     public void Dispose() => _db.Dispose();
@@ -58,7 +66,7 @@ public class CodeSubmittedConsumerTests : IDisposable
     [Fact]
     public async Task SubmissionNotFound_ReturnsWithoutThrowing()
     {
-        var ctx = FakeConsumeContext.For(new CodeSubmittedEvent(999L, Guid.NewGuid(), DateTime.UtcNow));
+        var ctx = FakeConsumeContext.For(new SubmissionCreatedEvent(999L, Guid.NewGuid(), DateTime.UtcNow));
         await _consumer.Consume(ctx); // should not throw
     }
 
@@ -67,9 +75,9 @@ public class CodeSubmittedConsumerTests : IDisposable
     {
         var sub = await SeedSubmission();
         _ai.Setup(a => a.ReviewCodeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-           .ReturnsAsync(new AiReviewResult("summary", []));
+           .ReturnsAsync(new ReviewerResult(ReviewStatus.Success, []));
 
-        var ctx = FakeConsumeContext.For(new CodeSubmittedEvent(sub.Id, Guid.NewGuid(), DateTime.UtcNow));
+        var ctx = FakeConsumeContext.For(new SubmissionCreatedEvent(sub.Id, Guid.NewGuid(), DateTime.UtcNow));
         await _consumer.Consume(ctx);
 
         var updated = await _db.Submissions.FindAsync(sub.Id);
@@ -81,13 +89,13 @@ public class CodeSubmittedConsumerTests : IDisposable
     {
         var sub = await SeedSubmission();
         _ai.Setup(a => a.ReviewCodeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-           .ReturnsAsync(new AiReviewResult("great code", [new AiLineComment(3, "use const", 10)]));
+           .ReturnsAsync(new ReviewerResult(ReviewStatus.Success, [new AiLineComment(3, "use const", 10)]));
 
-        var ctx = FakeConsumeContext.For(new CodeSubmittedEvent(sub.Id, Guid.NewGuid(), DateTime.UtcNow));
+        var ctx = FakeConsumeContext.For(new SubmissionCreatedEvent(sub.Id, Guid.NewGuid(), DateTime.UtcNow));
         await _consumer.Consume(ctx);
 
         _db.Reviews.Should().HaveCount(1);
-        _db.Reviews.First().Summary.Should().Be("great code");
+        _db.Reviews.First().Summary.Should().BeNull();
         _db.ReviewMetrics.Should().HaveCount(1);
         _db.ReviewMetrics.First().CommentCount.Should().Be(1);
     }
@@ -97,9 +105,9 @@ public class CodeSubmittedConsumerTests : IDisposable
     {
         var sub = await SeedSubmission();
         _ai.Setup(a => a.ReviewCodeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-           .ReturnsAsync(new AiReviewResult(null, []));
+           .ReturnsAsync(new ReviewerResult(ReviewStatus.Success, []));
 
-        var ctx = FakeConsumeContext.For(new CodeSubmittedEvent(sub.Id, Guid.NewGuid(), DateTime.UtcNow));
+        var ctx = FakeConsumeContext.For(new SubmissionCreatedEvent(sub.Id, Guid.NewGuid(), DateTime.UtcNow));
         await _consumer.Consume(ctx);
 
         var events = _db.Events.Where(e => e.SubmissionId == sub.Id).ToList();
@@ -112,9 +120,9 @@ public class CodeSubmittedConsumerTests : IDisposable
     {
         var sub = await SeedSubmission();
         _ai.Setup(a => a.ReviewCodeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-           .ReturnsAsync(new AiReviewResult(null, []));
+           .ReturnsAsync(new ReviewerResult(ReviewStatus.Success, []));
 
-        var ctx = FakeConsumeContext.For(new CodeSubmittedEvent(sub.Id, Guid.NewGuid(), DateTime.UtcNow));
+        var ctx = FakeConsumeContext.For(new SubmissionCreatedEvent(sub.Id, Guid.NewGuid(), DateTime.UtcNow));
         await _consumer.Consume(ctx);
 
         _publisher.Verify(p => p.Publish(It.IsAny<ReviewCompletedEvent>(), It.IsAny<CancellationToken>()), Times.Once);
@@ -130,7 +138,7 @@ public class CodeSubmittedConsumerTests : IDisposable
         sub.Status = staleStatus;
         await _db.SaveChangesAsync();
 
-        var ctx = FakeConsumeContext.For(new CodeSubmittedEvent(sub.Id, Guid.NewGuid(), DateTime.UtcNow));
+        var ctx = FakeConsumeContext.For(new SubmissionCreatedEvent(sub.Id, Guid.NewGuid(), DateTime.UtcNow));
         await _consumer.Consume(ctx);
 
         _ai.Verify(a => a.ReviewCodeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -147,7 +155,7 @@ public class CodeSubmittedConsumerTests : IDisposable
         _ai.Setup(a => a.ReviewCodeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
            .ThrowsAsync(new InvalidOperationException("ollama down"));
 
-        var ctx = FakeConsumeContext.For(new CodeSubmittedEvent(sub.Id, Guid.NewGuid(), DateTime.UtcNow));
+        var ctx = FakeConsumeContext.For(new SubmissionCreatedEvent(sub.Id, Guid.NewGuid(), DateTime.UtcNow));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => _consumer.Consume(ctx));
 

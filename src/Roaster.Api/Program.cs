@@ -1,3 +1,8 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using RabbitMQ.Client;
@@ -38,6 +43,11 @@ builder.Services.AddHealthChecks()
     });
 
 builder.Services.AddOpenApi();
+builder.Services.AddScoped<Roaster.Api.Services.SessionService>();
+builder.Services.AddScoped<Roaster.Api.Services.SubmissionService>();
+builder.Services.AddScoped<Roaster.Api.Services.ReviewService>();
+builder.Services.AddScoped<Roaster.Api.Services.ThreadService>();
+builder.Services.AddScoped<Roaster.Api.Services.EventService>();
 builder.Services.AddValidation();
 
 var app = builder.Build();

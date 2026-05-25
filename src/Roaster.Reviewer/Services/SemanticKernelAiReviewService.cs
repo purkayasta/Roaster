@@ -1,10 +1,16 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Roaster.Reviewer.Abstractions;
+using Roaster.Reviewer.Models;
 
 namespace Roaster.Reviewer.Services;
 
-public class SemanticKernelAiReviewService(
+public sealed class SemanticKernelAiReviewService(
     IChatCompletionService chat,
     ILogger<SemanticKernelAiReviewService> logger) : IAiReviewService
 {
@@ -34,7 +40,7 @@ public class SemanticKernelAiReviewService(
         Do not repeat your original comment verbatim — escalate or redirect.
         """;
 
-    public async Task<AiReviewResult> ReviewCodeAsync(string code, string language, CancellationToken ct = default)
+    public async Task<ReviewerResult> ReviewCodeAsync(string code, string language, CancellationToken ct = default)
     {
         logger.LogInformation("Starting AI code review, language {Language}, code length {Length} chars", language, code.Length);
 

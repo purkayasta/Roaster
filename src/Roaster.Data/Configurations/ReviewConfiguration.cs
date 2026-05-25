@@ -1,10 +1,15 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Roaster.Data.Models;
 
 namespace Roaster.Data.Configurations;
 
-public class ReviewConfiguration : IEntityTypeConfiguration<Review>
+public sealed class ReviewConfiguration : IEntityTypeConfiguration<Review>
 {
     public void Configure(EntityTypeBuilder<Review> builder)
     {
@@ -14,6 +19,11 @@ public class ReviewConfiguration : IEntityTypeConfiguration<Review>
         builder.Property(r => r.CreatedAt).IsRequired();
 
         builder.OwnsMany(r => r.Comments, b => b.ToJson("Comments"));
+
+        builder.HasOne(r => r.Metrics)
+               .WithOne(m => m.Review)
+               .HasForeignKey<ReviewMetrics>(m => m.ReviewId)
+               .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasMany(r => r.Threads)
                .WithOne(t => t.Review)

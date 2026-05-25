@@ -1,3 +1,8 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 namespace Roaster.Data.Models;
 
 public sealed class Review
@@ -9,5 +14,6 @@ public sealed class Review
     public DateTime CreatedAt { get; init; }
 
     public Submission Submission { get; set; } = null!;
+    public ReviewMetrics? Metrics { get; set; }
     public ICollection<CommentThread> Threads { get; set; } = [];
 }

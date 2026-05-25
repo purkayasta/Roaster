@@ -1,10 +1,16 @@
+/// <summary>
+/// Author: Pritom Purkayasta
+//  Copyright (c) Pritom Purkayasta All rights reserved.
+//  FREE TO USE TO CONNECT THE WORLD
+/// </summary>
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using Roaster.Reviewer;
+using Roaster.Reviewer.Models;
+using Roaster.Reviewer.Services;
 
 namespace Roaster.Reviewer.Tests;
 
-public class ReviewResponseParserTests
+public sealed class ReviewResponseParserTests
 {
     private static readonly NullLogger _logger = NullLogger.Instance;
 
@@ -14,7 +20,7 @@ public class ReviewResponseParserTests
         var raw = """{"summary":"Looks good.","comments":[{"lineNumber":3,"comment":"Unused var.","severity":10}]}""";
         var result = ReviewResponseParser.Parse(raw, _logger);
 
-        result.Summary.Should().Be("Looks good.");
+        result.Status.Should().Be(ReviewStatus.Success);
         result.LineComments.Should().HaveCount(1);
         result.LineComments[0].LineNumber.Should().Be(3);
         result.LineComments[0].Comment.Should().Be("Unused var.");
@@ -27,7 +33,7 @@ public class ReviewResponseParserTests
         var raw = "```json\n{\"summary\":\"ok\",\"comments\":[]}\n```";
         var result = ReviewResponseParser.Parse(raw, _logger);
 
-        result.Summary.Should().Be("ok");
+        result.Status.Should().Be(ReviewStatus.Success);
         result.LineComments.Should().BeEmpty();
     }
 
@@ -37,24 +43,24 @@ public class ReviewResponseParserTests
         var raw = "Here is my review:\n{\"summary\":\"nice\",\"comments\":[]}";
         var result = ReviewResponseParser.Parse(raw, _logger);
 
-        result.Summary.Should().Be("nice");
+        result.Status.Should().Be(ReviewStatus.Success);
     }
 
     [Fact]
-    public void MalformedJson_ReturnsEmptyResult()
+    public void MalformedJson_ReturnsFailedResult()
     {
         var result = ReviewResponseParser.Parse("not json at all", _logger);
 
-        result.Summary.Should().BeNull();
+        result.Status.Should().Be(ReviewStatus.Failed);
         result.LineComments.Should().BeEmpty();
     }
 
     [Fact]
-    public void EmptyResponse_ReturnsEmptyResult()
+    public void EmptyResponse_ReturnsFailedResult()
     {
         var result = ReviewResponseParser.Parse(string.Empty, _logger);
 
-        result.Summary.Should().BeNull();
+        result.Status.Should().Be(ReviewStatus.Failed);
         result.LineComments.Should().BeEmpty();
     }
 

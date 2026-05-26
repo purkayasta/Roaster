@@ -66,6 +66,24 @@ public sealed class CodeReviewService(
                 .Select(f => new CodeFileInput(f.FileName, f.Content, f.Language))
                 .ToList();
 
+            if (files.Count == 0)
+            {
+                var noFilesMsg = $"No files to review for submission {msg.SubmissionId}";
+                logger.LogWarning(noFilesMsg);
+                submission.Status = SubmissionStatus.Failed;
+                db.Events.Add(new Event
+                {
+                    SubmissionId = submission.Id,
+                    SessionId = submission.SessionId,
+                    EventType = EventType.Failed,
+                    CorrelationId = msg.CorrelationId,
+                    Metadata = JsonSerializer.Serialize(new { message = noFilesMsg }),
+                    OccurredAt = DateTime.UtcNow
+                });
+                await db.SaveChangesAsync(ct);
+                return;
+            }
+
             var totalChars = files.Sum(f => f.Content.Length);
             logger.LogInformation("Calling AI review for submission {Id}, {FileCount} file(s), {TotalChars} total chars",
                 msg.SubmissionId, files.Count, totalChars);
@@ -94,17 +112,24 @@ public sealed class CodeReviewService(
             }
 
             var firstFileName = files[0].FileName;
-            var review = new Review
+            var comments = new List<ReviewLineComment>(aiResult.LineComments.Count);
+            foreach (var c in aiResult.LineComments)
             {
-                SubmissionId = submission.Id,
-                Summary = aiResult.Summary,
-                Comments = aiResult.LineComments.Select(c => new ReviewLineComment
+                if (c.FileName is null)
+                    logger.LogWarning("AI comment at line {Line} is missing FileName; defaulting to {File}", c.LineNumber, firstFileName);
+                comments.Add(new ReviewLineComment
                 {
                     FileName   = (c.FileName ?? firstFileName)!,
                     LineNumber = c.LineNumber,
                     Comment    = c.Comment,
                     Severity   = (ReviewSeverity)c.Severity
-                }).ToList(),
+                });
+            }
+            var review = new Review
+            {
+                SubmissionId = submission.Id,
+                Summary = aiResult.Summary,
+                Comments = comments,
                 CreatedAt = DateTime.UtcNow
             };
 

@@ -24,7 +24,7 @@ public sealed class AiReviewService(
 
         var userMessage = BuildUserMessage(files);
 
-        var systemPrompt = Random.Shared.Next(2) == 0 ? PromptLoader.Reviewer : PromptLoader.Roaster;
+        var systemPrompt = PromptLoader.Reviewer;
         var history = new ChatHistory(systemPrompt);
         history.AddUserMessage(userMessage);
 
@@ -75,7 +75,7 @@ public sealed class AiReviewService(
             sb.AppendLine($"=== File: {file.FileName} ({file.Language}) ===");
             var lines = file.Content.Split('\n');
             for (var i = 0; i < lines.Length; i++)
-                sb.AppendLine($"{i + 1,4} | {lines[i]}");
+                sb.AppendLine($"{i + 1,4} | {lines[i].TrimEnd('\r')}");
             sb.AppendLine();
         }
         return sb.ToString();

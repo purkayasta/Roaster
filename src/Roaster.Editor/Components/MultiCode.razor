@@ -493,6 +493,10 @@
             }
         }
         catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Review polling failed: {ex.Message}", Severity.Error);
+        }
         finally
         {
             _polling = false;

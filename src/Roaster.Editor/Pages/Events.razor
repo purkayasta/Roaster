@@ -98,6 +98,10 @@
             }
         </MudExpansionPanels>
 
+    }
+
+    @if (!Running)
+    {
         <MudStack Row="true" Justify="Justify.Center" AlignItems="AlignItems.Center" Spacing="2" Class="mt-4">
             <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Disabled="_page <= 1 || _live" OnClick="PrevPage" />
             <MudText Typo="Typo.body2">Page @_page</MudText>

@@ -44,21 +44,34 @@
 
         <MudStack Row="true" Style="flex:1; min-height:0;" Spacing="2">
             <div style="flex:1; min-height:0; display:flex; flex-direction:column;">
-                <Code SessionId="@_session.Id" SubmissionId="@_session.SubmissionId" Content="@_session.CodeContent"
-                      Language="@_session.Language" OnCommentResolved="OnCommentResolved" />
+                @if (_isMultiFile)
+                {
+                    <MultiCode SessionId="@_session.Id" SubmissionId="@_session.SubmissionId"
+                               Payloads="@_session.Payloads" OnCommentResolved="OnCommentResolved" />
+                }
+                else
+                {
+                    <Code SessionId="@_session.Id" SubmissionId="@_session.SubmissionId"
+                          Content="@_session.Payloads.FirstOrDefault()?.Content"
+                          Language="@_session.Payloads.FirstOrDefault()?.Language"
+                          OnCommentResolved="OnCommentResolved" />
+                }
             </div>
-
         </MudStack>
     }
 </MudContainer>
 
 @code {
     [Parameter] public string? Id { get; set; }
+    [SupplyParameterFromQuery(Name = "mode")] public string? Mode { get; set; }
 
     private SessionDetailResponse? _session;
+    private bool _isMultiFile;
 
     protected override async Task OnParametersSetAsync()
     {
+        await base.OnParametersSetAsync();
+
         if (!Guid.TryParse(Id, out var sessionId)) return;
 
         await RunLogException(async () =>
@@ -67,6 +80,8 @@
             if (result.IsSuccess)
             {
                 _session = result.Data;
+                _isMultiFile = _session!.Payloads.Any(p => p.FileName != null)
+                               || string.Equals(Mode, "multi", StringComparison.OrdinalIgnoreCase);
             }
             else
             {

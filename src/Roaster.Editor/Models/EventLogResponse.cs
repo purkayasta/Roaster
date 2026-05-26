@@ -3,7 +3,7 @@
 //  Copyright (c) Pritom Purkayasta All rights reserved.
 //  FREE TO USE TO CONNECT THE WORLD
 /// </summary>
-namespace Roaster.Editor.Services.Models;
+namespace Roaster.Editor.Models;
 
 public record EventLogResponse
 {

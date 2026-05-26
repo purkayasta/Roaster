@@ -5,7 +5,7 @@
 /// </summary>
 using System.Net.Http.Json;
 
-namespace Roaster.Editor.Services.Models;
+namespace Roaster.Editor.Models;
 
 public record ApiResponse<T>
 {

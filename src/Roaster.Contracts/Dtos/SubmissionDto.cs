@@ -5,9 +5,9 @@
 /// </summary>
 namespace Roaster.Contracts.Dtos;
 
-public record SubmissionDto(
+public sealed record SubmissionDto(
     long Id,
-    string? Language,
+    List<string> FileNames,
     string Status,
     DateTime CreatedAt,
     DateTime UpdatedAt);

@@ -9,7 +9,7 @@ using BlazorMonaco.Editor;
 using Microsoft.JSInterop;
 using EditorGlobal = BlazorMonaco.Editor.Global;
 
-namespace Roaster.Editor.Services;
+namespace Roaster.Editor.Utils;
 
 public static class ThemeFactory
 {

@@ -3,9 +3,6 @@
 //  Copyright (c) Pritom Purkayasta All rights reserved.
 //  FREE TO USE TO CONNECT THE WORLD
 /// </summary>
-namespace Roaster.Editor.Services;
+namespace Roaster.Contracts.Dtos;
 
-public sealed class ApiOptions
-{
-    public string BaseUrl { get; set; } = string.Empty;
-}
+public sealed record PayloadDto(string FileName, string Content, string Language);

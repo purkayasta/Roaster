@@ -7,11 +7,12 @@ using System.Text.Json.Serialization;
 
 namespace Roaster.Reviewer.Models;
 
-internal record AiReviewResponse(
+internal sealed record AiReviewResponse(
     [property: JsonPropertyName("summary")]  string? Summary,
     [property: JsonPropertyName("comments")] List<AiReviewComment>? Comments);
 
-internal record AiReviewComment(
+internal sealed record AiReviewComment(
+    [property: JsonPropertyName("fileName")]   string? FileName,
     [property: JsonPropertyName("lineNumber")] int LineNumber,
     [property: JsonPropertyName("comment")]    string? Comment,
     [property: JsonPropertyName("severity")]   int Severity = 20);

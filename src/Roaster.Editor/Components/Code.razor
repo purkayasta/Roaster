@@ -53,8 +53,7 @@
                     <div @key="comment.LineNumber" @ref="_commentRefs[comment.LineNumber]" data-line="@comment.LineNumber"
                          style="position:absolute; left:0; right:0; pointer-events:auto;">
                         <Comment SubmissionId="_submissionId!.Value" ReviewId="_review.Id" CommentData="comment"
-                                 OnZoneResize="() => ResizeZoneAsync(comment.LineNumber)"
-                                 OnResolved="OnCommentResolved" />
+                                 OnZoneResize="() => ResizeZoneAsync(comment.LineNumber)" OnResolved="OnCommentResolved" />
                     </div>
                 }
             </div>
@@ -86,6 +85,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await base.OnInitializedAsync();
+
         if (!string.IsNullOrWhiteSpace(Language))
             _language = Language;
 
@@ -100,6 +101,8 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        await base.OnAfterRenderAsync(firstRender);
+
         if (!_reviewDirty || _review is null) return;
         _reviewDirty = false;
 
@@ -121,20 +124,8 @@
         });
     }
 
-    private StandaloneEditorConstructionOptions BuildOptions(StandaloneCodeEditor _) => new()
-    {
-        AutomaticLayout = true,
-        Language = _language,
-        Value = string.IsNullOrWhiteSpace(Content) ? CodeUtils.DefaultBoilerplate : Content,
-        Theme = _theme,
-        WordWrap = "on",
-        ScrollBeyondLastLine = false,
-        Minimap = new EditorMinimapOptions { Enabled = false },
-        LineNumbers = "on",
-        FontSize = 14,
-        GlyphMargin = true,
-        FontFamily = "'Geist Mono', 'Cascadia Code', 'Fira Code', monospace",
-    };
+    private StandaloneEditorConstructionOptions BuildOptions(StandaloneCodeEditor _)
+        => CodeUtils.BuildEditorOptions(_language, _theme, string.IsNullOrWhiteSpace(Content) ? CodeUtils.DefaultBoilerplate : Content);
 
     private async Task OnLanguageChangedAsync(string language) =>
         await CodeUtils.SetLanguageAsync(JS, _editor, language);
@@ -147,7 +138,8 @@
         await RunLogException(async () =>
         {
             var code = await _editor.GetValue();
-            var result = await SubmissionService.SubmitAsync(SessionId, code, _language);
+            var fileName = LanguageExtensionMap.DefaultFileName(_language);
+            var result = await SubmissionService.SubmitAsync(SessionId, [new FileSubmissionRequest(fileName, code, _language)]);
             if (!result.IsSuccess)
             {
                 Snackbar.Add(result.Error ?? $"Request failed ({result.StatusCode}).", Severity.Error);

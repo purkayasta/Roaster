@@ -42,10 +42,10 @@ internal static class ReviewResponseParser
 
             var comments = (response.Comments ?? [])
                 .Where(c => c.LineNumber > 0)
-                .Select(c => new AiLineComment(c.LineNumber, c.Comment, c.Severity))
+                .Select(c => new AiLineComment(c.LineNumber, c.Comment, c.Severity, c.FileName))
                 .ToList();
 
-            result = new ReviewerResult(ReviewStatus.Success, comments);
+            result = new ReviewerResult(ReviewStatus.Success, comments, response.Summary);
             return true;
         }
         catch (JsonException)

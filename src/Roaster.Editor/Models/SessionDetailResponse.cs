@@ -3,15 +3,16 @@
 //  Copyright (c) Pritom Purkayasta All rights reserved.
 //  FREE TO USE TO CONNECT THE WORLD
 /// </summary>
-namespace Roaster.Editor.Services.Models;
+namespace Roaster.Editor.Models;
 
 public record SessionDetailResponse(
     Guid Id,
     string Name,
     DateTime CreatedAt,
-    string? CodeContent,
-    string? Language,
     string? Status,
     long? SubmissionId,
     int TotalComments,
-    int ResolvedComments);
+    int ResolvedComments,
+    List<PayloadResponse> Payloads);
+
+public record PayloadResponse(string? FileName, string? Content, string? Language);

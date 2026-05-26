@@ -117,7 +117,11 @@
     private string _sessionIdInput = string.Empty;
     private Guid? _activeSessionId;
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        await LoadAsync();
+    }
 
     private async Task LoadAsync()
     {

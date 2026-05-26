@@ -9,7 +9,7 @@ public sealed class Submission
 {
     public long Id { get; init; }
     public Guid SessionId { get; init; }
-    public required CodePayload Payload { get; set; }
+    public required List<Payload> Payloads { get; set; }
     public SubmissionStatus Status { get; set; } = SubmissionStatus.Submitted;
     public DateTime CreatedAt { get; init; }
     public DateTime UpdatedAt { get; set; }

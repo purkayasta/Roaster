@@ -32,7 +32,7 @@ public sealed class ReviewService(RoasterDbContext db, ILogger<ReviewService> lo
             review.Comments.Select(c =>
             {
                 var thread = review.Threads.FirstOrDefault(t => t.LineNumber == c.LineNumber);
-                return new ReviewCommentDto(c.LineNumber, c.Comment, c.Severity.ToString(), thread?.Id, thread?.Status == ThreadStatus.Resolved);
+                return new ReviewCommentDto(c.LineNumber, c.Comment, c.Severity.ToString(), thread?.Id, thread?.Status == ThreadStatus.Resolved, c.FileName);
             }).ToList()));
     }
 }

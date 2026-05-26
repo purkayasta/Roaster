@@ -28,6 +28,8 @@
 
     protected override void OnParametersSet()
     {
+        base.OnParametersSet();
+
         if (Json == _lastJson) return;
         _lastJson = Json;
 

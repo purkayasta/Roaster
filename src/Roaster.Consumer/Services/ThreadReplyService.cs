@@ -34,7 +34,7 @@ public sealed class ThreadReplyService(
             return;
         }
 
-        var code = thread.Review.Submission.Payload.Content;
+        var code = string.Join("\n\n", thread.Review.Submission.Payloads.Select(f => f.Content));
         var originalComment = thread.Review.Comments
             .FirstOrDefault(c => c.LineNumber == thread.LineNumber)?.Comment ?? string.Empty;
 

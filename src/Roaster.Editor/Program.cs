@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using MudBlazor.Services;
 using Roaster.Editor;
 using Roaster.Editor.Services;
+using Roaster.Editor.Utils;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");

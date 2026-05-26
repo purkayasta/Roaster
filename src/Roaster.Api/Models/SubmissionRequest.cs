@@ -13,10 +13,6 @@ public sealed class SubmissionRequest
     public Guid SessionId { get; init; }
 
     [Required]
-    [StringLength(50000, MinimumLength = 1)]
-    public string Code { get; init; } = string.Empty;
-
-    [Required]
-    [AllowedValues("csharp", "javascript", "typescript", "python", "java", "go", "rust", "cpp", "sql")]
-    public string Language { get; init; } = string.Empty;
+    [MinLength(1)]
+    public List<FileSubmission> Files { get; init; } = [];
 }

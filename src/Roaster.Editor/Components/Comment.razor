@@ -98,6 +98,8 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        await base.OnAfterRenderAsync(firstRender);
+
         if (_pendingResize)
         {
             _pendingResize = false;
@@ -107,6 +109,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await base.OnInitializedAsync();
+
         _isResolved = CommentData.IsResolved;
         _collapsed = _isResolved;
         if (CommentData.ThreadId is not { } threadId) return;

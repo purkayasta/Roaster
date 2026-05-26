@@ -35,9 +35,10 @@ public sealed class SessionService(RoasterDbContext db, ILogger<SessionService> 
         var results = sessions.Select(s =>
         {
             var latest = s.Submissions.MaxBy(sub => sub.Id);
-            var total    = latest?.Review?.Comments.Count ?? 0;
+            var total = latest?.Review?.Comments.Count ?? 0;
             var resolved = latest?.Review?.Threads.Count(t => t.Status == ThreadStatus.Resolved) ?? 0;
-            return new SessionSubmissionDto(latest?.Id, s.Id, s.Name, latest?.Payload.Language, latest?.Status.ToString(), s.CreatedAt, total, resolved);
+            var isMulti = latest?.Payloads.Any(p => p.FileName != null) ?? false;
+            return new SessionSubmissionDto(SubmissionId: latest?.Id, SessionId: s.Id, SessionName: s.Name, Status: latest?.Status.ToString(), SessionCreatedAt: s.CreatedAt, TotalComments: total, ResolvedComments: resolved, IsMultiFile: isMulti);
         }).ToList();
 
         logger.LogInformation("Returning {Count} sessions", results.Count);
@@ -54,14 +55,20 @@ public sealed class SessionService(RoasterDbContext db, ILogger<SessionService> 
 
         if (session is null) return ServiceResult<SessionDetailDto>.NotFound();
 
-        var latest   = session.Submissions.MaxBy(s => s.Id);
-        var total    = latest?.Review?.Comments.Count ?? 0;
+        var latest = session.Submissions.MaxBy(s => s.Id);
+        var total = latest?.Review?.Comments.Count ?? 0;
         var resolved = latest?.Review?.Threads.Count(t => t.Status == ThreadStatus.Resolved) ?? 0;
         logger.LogInformation("Session {Id} fetched", id);
+        var payloads = latest?.Payloads.Select(p => new PayloadDto(p.FileName, p.Content, p.Language)).ToList() ?? [];
         return ServiceResult<SessionDetailDto>.Ok(new SessionDetailDto(
-            session.Id, session.Name, session.CreatedAt,
-            latest?.Payload.Content, latest?.Payload.Language, latest?.Status.ToString(), latest?.Id,
-            total, resolved));
+            session.Id,
+            session.Name,
+            session.CreatedAt,
+            latest?.Status.ToString(),
+            latest?.Id,
+            total,
+            resolved,
+            payloads));
     }
 
     public async Task<ServiceResult> DeleteAsync(Guid id, CancellationToken ct)

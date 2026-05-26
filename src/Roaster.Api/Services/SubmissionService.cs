@@ -9,8 +9,10 @@ using Roaster.Data.Models;
 
 namespace Roaster.Api.Services;
 
-public sealed class SubmissionService(RoasterDbContext db, IPublishEndpoint publisher, ILogger<SubmissionService> logger)
+public sealed partial class SubmissionService(RoasterDbContext db, IPublishEndpoint publisher, ILogger<SubmissionService> logger)
 {
+    [GeneratedRegex(@"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")]
+    private static partial Regex ControlCharsRegex();
     public async Task<ServiceResult<SubmissionDto>> CreateAsync(SubmissionRequest req, CancellationToken ct)
     {
         var session = await db.Sessions.FindAsync([req.SessionId], ct);
@@ -20,14 +22,21 @@ public sealed class SubmissionService(RoasterDbContext db, IPublishEndpoint publ
             .AnyAsync(s => s.SessionId == req.SessionId && s.Status == SubmissionStatus.Processing, ct);
         if (inFlight) return ServiceResult<SubmissionDto>.Conflict("A review is currently in progress. Please wait before submitting again.");
 
-        var sanitizedCode = Regex.Replace(req.Code, @"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "");
+        var files = req.Files
+            .Select(f => new Payload
+            {
+                FileName = f.FileName,
+                Content = ControlCharsRegex().Replace(f.Content, ""),
+                Language = f.Language
+            })
+            .ToList();
 
         await using var tx = await db.Database.BeginTransactionAsync(ct);
 
         var submission = new Submission
         {
             SessionId = req.SessionId,
-            Payload   = new CodePayload { Content = sanitizedCode, Language = req.Language },
+            Payloads = files,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -36,17 +45,18 @@ public sealed class SubmissionService(RoasterDbContext db, IPublishEndpoint publ
 
         db.Events.Add(new Roaster.Data.Models.Event
         {
-            SubmissionId  = submission.Id,
-            SessionId     = req.SessionId,
-            EventType     = EventType.Submitted,
+            SubmissionId = submission.Id,
+            SessionId = req.SessionId,
+            EventType = EventType.Submitted,
             CorrelationId = session.Id,
-            OccurredAt    = DateTime.UtcNow
+            OccurredAt = DateTime.UtcNow
         });
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
 
         await publisher.Publish(new SubmissionCreatedEvent(submission.Id, session.Id, DateTime.UtcNow), ct);
-        logger.LogInformation("Submission {Id} created for session {SessionId}", submission.Id, req.SessionId);
+        logger.LogInformation("Submission {Id} created for session {SessionId} with {FileCount} file(s)",
+            submission.Id, req.SessionId, submission.Payloads.Count);
 
         return ServiceResult<SubmissionDto>.Ok(ToDto(submission));
     }
@@ -61,5 +71,5 @@ public sealed class SubmissionService(RoasterDbContext db, IPublishEndpoint publ
     }
 
     private static SubmissionDto ToDto(Submission s) =>
-        new(s.Id, s.Payload.Language, s.Status.ToString(), s.CreatedAt, s.UpdatedAt);
+        new(s.Id, s.Payloads.Select(f => f.FileName).ToList(), s.Status.ToString(), s.CreatedAt, s.UpdatedAt);
 }

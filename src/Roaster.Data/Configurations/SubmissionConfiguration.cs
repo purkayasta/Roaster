@@ -24,7 +24,7 @@ public sealed class SubmissionConfiguration : IEntityTypeConfiguration<Submissio
                .HasForeignKey(s => s.SessionId)
                .OnDelete(DeleteBehavior.Cascade);
 
-        builder.OwnsOne(s => s.Payload, b => b.ToJson("Payload"));
+        builder.OwnsMany(s => s.Payloads, b => b.ToJson("Payloads"));
 
         builder.Property(s => s.Status).HasConversion<int>().IsRequired();
         builder.Property(s => s.CreatedAt).IsRequired();

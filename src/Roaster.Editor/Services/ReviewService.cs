@@ -4,7 +4,7 @@
 //  FREE TO USE TO CONNECT THE WORLD
 /// </summary>
 using System.Net.Http.Json;
-using Roaster.Editor.Services.Models;
+using Roaster.Editor.Models;
 
 namespace Roaster.Editor.Services;
 

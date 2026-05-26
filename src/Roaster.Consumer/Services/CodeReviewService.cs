@@ -28,7 +28,7 @@ public sealed class CodeReviewService(
     {
         logger.LogInformation("Processing SubmissionCreatedEvent for submission {Id}", msg.SubmissionId);
 
-        var submission = await db.Submissions.FindAsync(new object?[] { msg.SubmissionId, ct }, cancellationToken: ct);
+        var submission = await db.Submissions.FindAsync([msg.SubmissionId], ct);
         if (submission is null)
         {
             logger.LogWarning("Submission {Id} not found — discarding", msg.SubmissionId);
@@ -62,11 +62,15 @@ public sealed class CodeReviewService(
 
         try
         {
-            logger.LogInformation("Calling AI review for submission {Id}, language {Language}, code length {Length} chars",
-                msg.SubmissionId, submission.Payload.Language, submission.Payload.Content.Length);
+            var files = submission.Payloads
+                .Select(f => new CodeFileInput(f.FileName, f.Content, f.Language))
+                .ToList();
 
-            var aiResult = await ai.ReviewCodeAsync(
-                submission.Payload.Content, submission.Payload.Language, ct);
+            var totalChars = files.Sum(f => f.Content.Length);
+            logger.LogInformation("Calling AI review for submission {Id}, {FileCount} file(s), {TotalChars} total chars",
+                msg.SubmissionId, files.Count, totalChars);
+
+            var aiResult = await ai.ReviewCodeAsync(files, ct);
 
             logger.LogInformation("AI review completed for submission {Id} in {ElapsedMs}ms, status {Status}, {CommentCount} comments",
                 msg.SubmissionId, stopwatch.ElapsedMilliseconds, aiResult.Status, aiResult.LineComments.Count);
@@ -89,15 +93,17 @@ public sealed class CodeReviewService(
                 return;
             }
 
+            var firstFileName = files[0].FileName;
             var review = new Review
             {
                 SubmissionId = submission.Id,
-                Summary = null,
+                Summary = aiResult.Summary,
                 Comments = aiResult.LineComments.Select(c => new ReviewLineComment
                 {
+                    FileName   = (c.FileName ?? firstFileName)!,
                     LineNumber = c.LineNumber,
-                    Comment = c.Comment,
-                    Severity = (ReviewSeverity)c.Severity
+                    Comment    = c.Comment,
+                    Severity   = (ReviewSeverity)c.Severity
                 }).ToList(),
                 CreatedAt = DateTime.UtcNow
             };
@@ -116,7 +122,7 @@ public sealed class CodeReviewService(
                 ReviewDurationMs = (int)stopwatch.Elapsed.TotalMilliseconds,
                 TotalDurationMs = (int)(DateTime.UtcNow - msg.SubmittedAt).TotalMilliseconds,
                 CommentCount = review.Comments.Count,
-                CodeLengthChars = submission.Payload.Content.Length,
+                CodeLengthChars = totalChars,
                 CreatedAt = DateTime.UtcNow
             });
 

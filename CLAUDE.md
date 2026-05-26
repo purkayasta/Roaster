@@ -85,3 +85,12 @@ All Docker images use alpine variants for minimal size. Ollama model is configur
 **Backend services:** `Roaster.Api` has a `Services/` folder with one service per resource. All business logic lives there; endpoints are thin wrappers that return `ServiceResult<T>` directly (it implements `IResult`).
 
 **Tests:** xUnit + Moq + FluentAssertions. Api tests use `WebApplicationFactory` + EF InMemory + mocked `IPublishEndpoint`. Consumer tests use `FakeConsumeContext`. No real broker or database needed for tests.
+
+---
+
+## Coding Conventions
+
+- **`sealed` by default.** Every new class is `sealed` unless inheritance is explicitly required.
+- **`record` for data.** DTOs, request/response models, and value objects use `sealed record`. Use `class` only when mutability or methods make `record` inappropriate.
+- **No overengineering.** No abstractions, interfaces, or generics unless there are multiple concrete uses right now. Three similar lines beats a premature abstraction.
+- **Performance at call sites.** Prefer `IReadOnlyList` over `IEnumerable` for already-materialised collections. Avoid unnecessary `.ToList()` copies. Be allocation-aware in hot paths (consumer processing, polling loops).

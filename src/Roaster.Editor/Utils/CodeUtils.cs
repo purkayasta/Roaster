@@ -7,17 +7,17 @@ using BlazorMonaco.Editor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using MudBlazor;
-using Roaster.Editor.Services.Models;
+using Roaster.Editor.Models;
 using EditorGlobal = BlazorMonaco.Editor.Global;
 
-namespace Roaster.Editor.Services;
+namespace Roaster.Editor.Utils;
 
 public static class CodeUtils
 {
-    public const string EditorId           = "code-editor-main";
+    public const string EditorId = "code-editor-main";
     public const string DefaultBoilerplate = "// Paste your code here and click Submit to get a review.\n";
-    public const string DefaultLanguage    = "csharp";
-    public const string DefaultTheme       = "vs-dark";
+    public const string DefaultLanguage = "csharp";
+    public const string DefaultTheme = "vs-dark";
 
     public static readonly IReadOnlyList<string> Languages =
     [
@@ -33,6 +33,21 @@ public static class CodeUtils
     public static IEnumerable<(string Key, string Label)> Themes =>
         [.. BuiltInThemes, .. ThemeFactory.CustomThemes];
 
+    public static StandaloneEditorConstructionOptions BuildEditorOptions(string language, string theme, string initialValue = "") => new()
+    {
+        AutomaticLayout = true,
+        Language = language,
+        Value = initialValue,
+        Theme = theme,
+        WordWrap = "on",
+        ScrollBeyondLastLine = false,
+        Minimap = new EditorMinimapOptions { Enabled = false },
+        LineNumbers = "on",
+        FontSize = 14,
+        GlyphMargin = true,
+        FontFamily = "'Geist Mono', 'Cascadia Code', 'Fira Code', monospace",
+    };
+
     public static async Task SetLanguageAsync(IJSRuntime js, StandaloneCodeEditor editor, string language)
     {
         var model = await editor.GetModel();
@@ -44,10 +59,10 @@ public static class CodeUtils
 
     public static Color GetSeverityColor(string severity) => severity.ToLowerInvariant() switch
     {
-        "error"   => Color.Error,
+        "error" => Color.Error,
         "warning" => Color.Warning,
-        "info"    => Color.Info,
-        _         => Color.Default
+        "info" => Color.Info,
+        _ => Color.Default
     };
 
     // --- ViewZone / decoration interop ---

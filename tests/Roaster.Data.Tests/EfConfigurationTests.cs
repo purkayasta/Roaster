@@ -64,7 +64,7 @@ public sealed class EfConfigurationTests
         var sub = new Submission
         {
             SessionId = session.Id,
-            Payload   = new CodePayload { Content = "x", Language = "csharp" },
+            Payloads  = [new Payload { FileName = "main.cs", Content = "x", Language = "csharp" }],
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow.AddDays(-1)
         };

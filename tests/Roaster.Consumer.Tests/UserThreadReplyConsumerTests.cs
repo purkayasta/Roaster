@@ -47,7 +47,7 @@ public sealed class ReplyProcessorTests : IDisposable
         var sub = new Submission
         {
             SessionId = session.Id,
-            Payload   = new CodePayload { Content = "var x = 1;", Language = "csharp" },
+            Payloads  = [new Payload { FileName = "main.cs", Content = "var x = 1;", Language = "csharp" }],
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -57,7 +57,7 @@ public sealed class ReplyProcessorTests : IDisposable
         var review = new Review
         {
             SubmissionId = sub.Id,
-            Comments = [new ReviewLineComment { LineNumber = 5, Comment = "orig", Severity = ReviewSeverity.Medium }],
+            Comments = [new ReviewLineComment { FileName = "main.cs", LineNumber = 5, Comment = "orig", Severity = ReviewSeverity.Medium }],
             CreatedAt = DateTime.UtcNow
         };
         _db.Reviews.Add(review);

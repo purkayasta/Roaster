@@ -94,16 +94,17 @@
         }
 
         <div style="position:relative; flex:1; min-height:0;">
-            <StandaloneCodeEditor @ref="_editor" Id="@CodeUtils.EditorId" ConstructionOptions="BuildOptions" />
+            <StandaloneCodeEditor @ref="_editor" Id="@CodeUtils.EditorId" ConstructionOptions="BuildOptions"
+                                  OnMouseDown="OnEditorMouseDown" />
 
             @if (ActiveFileCommentCount > 0)
             {
-                <div id="roaster-comment-overlay-multi"
-                     style="position:absolute; top:0; left:0; right:0; bottom:0; pointer-events:none; overflow:hidden; z-index:10; visibility:hidden;">
+                @* Staging host: Blazor owns these nodes. Clicking a gutter dot moves the
+                   matching node into a native Monaco view zone (and back on close). *@
+                <div style="display:none;">
                     @foreach (var comment in ActiveFileComments)
                     {
-                        <div @key="comment.LineNumber" @ref="_commentRefs[comment.LineNumber]" data-line="@comment.LineNumber"
-                             style="position:absolute; left:0; right:0; pointer-events:auto;">
+                        <div @key="comment.LineNumber" @ref="_commentRefs[comment.LineNumber]">
                             <Comment SubmissionId="_submissionId!.Value" ReviewId="_review!.Id" CommentData="comment"
                                      OnZoneResize="() => ResizeZoneAsync(comment.LineNumber)"
                                      OnResolved="() => OnSingleCommentResolvedAsync(comment)" />
@@ -239,21 +240,43 @@
         {
             await ClearZonesAndDecorationsAsync();
             var comments = ActiveFileComments;
+            if (comments.Count == 0) return;
 
-            foreach (var comment in comments)
-            {
-                if (!_commentRefs.TryGetValue(comment.LineNumber, out var domRef)) continue;
-                var zoneId = await JS.InvokeAsync<string?>("RoasterReview.addZone", CodeUtils.EditorId, comment.LineNumber, domRef);
-                if (zoneId is not null) _zoneIds[comment.LineNumber] = zoneId;
-            }
-
-            if (comments.Count > 0)
-            {
-                var args = comments.Select(c => new { lineNumber = c.LineNumber, severity = c.Severity }).ToArray();
-                _decorationIds = await JS.InvokeAsync<string[]>("RoasterReview.addDecorations", CodeUtils.EditorId, args);
-                await JS.InvokeVoidAsync("RoasterReview.syncOverlay", CodeUtils.EditorId, "roaster-comment-overlay-multi");
-            }
+            // Draw the clickable gutter dots; the comment boxes open on click.
+            var args = comments.Select(c => new { lineNumber = c.LineNumber, severity = c.Severity }).ToArray();
+            _decorationIds = await JS.InvokeAsync<string[]>("RoasterReview.addDecorations", CodeUtils.EditorId, args);
         });
+    }
+
+    private async Task OnEditorMouseDown(EditorMouseEvent e)
+    {
+        if (e.Target.Type != MouseTargetType.GUTTER_GLYPH_MARGIN) return;
+        if (e.Target.Position is not { } pos) return;
+        if (!_commentRefs.ContainsKey(pos.LineNumber)) return;
+        await ToggleZoneAsync(pos.LineNumber);
+    }
+
+    private async Task ToggleZoneAsync(int lineNumber)
+    {
+        if (_zoneIds.ContainsKey(lineNumber))
+            await CloseZoneAsync(lineNumber);
+        else
+            await OpenZoneAsync(lineNumber);
+    }
+
+    private async Task OpenZoneAsync(int lineNumber)
+    {
+        if (_zoneIds.ContainsKey(lineNumber)) return;
+        if (!_commentRefs.TryGetValue(lineNumber, out var domRef)) return;
+        var zoneId = await JS.InvokeAsync<string?>("RoasterReview.addZone", CodeUtils.EditorId, lineNumber, domRef);
+        if (zoneId is not null) _zoneIds[lineNumber] = zoneId;
+    }
+
+    private async Task CloseZoneAsync(int lineNumber)
+    {
+        if (!_zoneIds.TryGetValue(lineNumber, out var zoneId)) return;
+        await JS.InvokeVoidAsync("RoasterReview.removeZone", CodeUtils.EditorId, zoneId);
+        _zoneIds.Remove(lineNumber);
     }
 
     // --- Editor construction ---
@@ -421,11 +444,9 @@
     {
         await RunLogException(async () =>
         {
-            if (_zoneIds.TryGetValue(comment.LineNumber, out var zoneId))
-            {
-                await JS.InvokeVoidAsync("RoasterReview.removeZones", CodeUtils.EditorId, new[] { zoneId });
-                _zoneIds.Remove(comment.LineNumber);
-            }
+            // Close first so the node is restored to the staging host before Blazor
+            // removes its wrapper below.
+            await CloseZoneAsync(comment.LineNumber);
             _commentRefs.Remove(comment.LineNumber);
             _review!.Comments.RemoveAll(c => c.LineNumber == comment.LineNumber && c.FileName == comment.FileName);
 
@@ -440,9 +461,6 @@
                 var args = remaining.Select(c => new { lineNumber = c.LineNumber, severity = c.Severity }).ToArray();
                 _decorationIds = await JS.InvokeAsync<string[]>("RoasterReview.addDecorations", CodeUtils.EditorId, args);
             }
-
-            if (_zoneIds.Count > 0)
-                await JS.InvokeVoidAsync("RoasterReview.syncOverlay", CodeUtils.EditorId, "roaster-comment-overlay-multi");
 
             await OnCommentResolved.InvokeAsync();
         });
@@ -517,13 +535,7 @@
     private async Task ResizeZoneAsync(int lineNumber)
     {
         if (!_zoneIds.TryGetValue(lineNumber, out var zoneId)) return;
-        if (!_commentRefs.TryGetValue(lineNumber, out var domRef)) return;
-
-        await RunLogException(async () =>
-        {
-            await JS.InvokeVoidAsync("RoasterReview.updateZoneHeight", CodeUtils.EditorId, zoneId, domRef);
-            await JS.InvokeVoidAsync("RoasterReview.syncOverlay", CodeUtils.EditorId, "roaster-comment-overlay-multi");
-        });
+        await RunLogException(() => JS.InvokeVoidAsync("RoasterReview.updateZoneHeight", CodeUtils.EditorId, zoneId).AsTask());
     }
 
     private async Task ClearZonesAndDecorationsAsync()

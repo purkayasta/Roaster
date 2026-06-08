@@ -70,8 +70,11 @@ public static class CodeUtils
     public static Task<string?> AddReviewZoneAsync(IJSRuntime js, int lineNumber, ElementReference domRef) =>
         js.InvokeAsync<string?>("RoasterReview.addZone", EditorId, lineNumber, domRef).AsTask();
 
-    public static Task UpdateZoneHeightAsync(IJSRuntime js, string zoneId, ElementReference domRef) =>
-        js.InvokeVoidAsync("RoasterReview.updateZoneHeight", EditorId, zoneId, domRef).AsTask();
+    public static Task UpdateZoneHeightAsync(IJSRuntime js, string zoneId) =>
+        js.InvokeVoidAsync("RoasterReview.updateZoneHeight", EditorId, zoneId).AsTask();
+
+    public static Task RemoveZoneAsync(IJSRuntime js, string zoneId) =>
+        js.InvokeVoidAsync("RoasterReview.removeZone", EditorId, zoneId).AsTask();
 
     public static Task RemoveZonesAsync(IJSRuntime js, IEnumerable<string> zoneIds) =>
         js.InvokeVoidAsync("RoasterReview.removeZones", EditorId, zoneIds.ToArray()).AsTask();
@@ -84,7 +87,4 @@ public static class CodeUtils
 
     public static Task ClearDecorationsAsync(IJSRuntime js, string[] decorationIds) =>
         js.InvokeVoidAsync("RoasterReview.clearDecorations", EditorId, decorationIds).AsTask();
-
-    public static Task SyncOverlayAsync(IJSRuntime js) =>
-        js.InvokeVoidAsync("RoasterReview.syncOverlay", EditorId, "roaster-comment-overlay").AsTask();
 }

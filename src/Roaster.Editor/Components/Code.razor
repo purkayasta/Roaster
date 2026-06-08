@@ -42,16 +42,17 @@
     </MudPaper>
 
     <div style="position:relative; flex:1; min-height:0;">
-        <StandaloneCodeEditor @ref="_editor" Id="@CodeUtils.EditorId" ConstructionOptions="BuildOptions" />
+        <StandaloneCodeEditor @ref="_editor" Id="@CodeUtils.EditorId" ConstructionOptions="BuildOptions"
+                              OnMouseDown="OnEditorMouseDown" />
 
         @if (_review is not null)
         {
-            <div id="roaster-comment-overlay"
-                 style="position:absolute; top:0; left:0; right:0; bottom:0; pointer-events:none; overflow:hidden; z-index:10; visibility:hidden;">
+            @* Staging host: Blazor owns these nodes. Clicking a gutter dot moves the
+               matching node into a native Monaco view zone (and back on close). *@
+            <div style="display:none;">
                 @foreach (var comment in _review.Comments)
                 {
-                    <div @key="comment.LineNumber" @ref="_commentRefs[comment.LineNumber]" data-line="@comment.LineNumber"
-                         style="position:absolute; left:0; right:0; pointer-events:auto;">
+                    <div @key="comment.LineNumber" @ref="_commentRefs[comment.LineNumber]">
                         <Comment SubmissionId="_submissionId!.Value" ReviewId="_review.Id" CommentData="comment"
                                  OnZoneResize="() => ResizeZoneAsync(comment.LineNumber)" OnResolved="OnCommentResolved" />
                     </div>
@@ -109,19 +110,42 @@
         await RunLogException(async () =>
         {
             await ClearZonesAndDecorationsAsync();
+            if (_review.Comments.Count == 0) return;
 
-            foreach (var comment in _review.Comments)
-            {
-                if (!_commentRefs.TryGetValue(comment.LineNumber, out var domRef)) continue;
-
-                var zoneId = await CodeUtils.AddReviewZoneAsync(JS, comment.LineNumber, domRef);
-                if (zoneId is not null)
-                    _zoneIds[comment.LineNumber] = zoneId;
-            }
-
+            // Draw the clickable gutter dots; the comment boxes open on click.
             _decorationIds = await CodeUtils.AddReviewDecorationsAsync(JS, _review.Comments);
-            await CodeUtils.SyncOverlayAsync(JS);
         });
+    }
+
+    private async Task OnEditorMouseDown(EditorMouseEvent e)
+    {
+        if (e.Target.Type != MouseTargetType.GUTTER_GLYPH_MARGIN) return;
+        if (e.Target.Position is not { } pos) return;
+        if (!_commentRefs.ContainsKey(pos.LineNumber)) return;
+        await ToggleZoneAsync(pos.LineNumber);
+    }
+
+    private async Task ToggleZoneAsync(int lineNumber)
+    {
+        if (_zoneIds.ContainsKey(lineNumber))
+            await CloseZoneAsync(lineNumber);
+        else
+            await OpenZoneAsync(lineNumber);
+    }
+
+    private async Task OpenZoneAsync(int lineNumber)
+    {
+        if (_zoneIds.ContainsKey(lineNumber)) return;
+        if (!_commentRefs.TryGetValue(lineNumber, out var domRef)) return;
+        var zoneId = await CodeUtils.AddReviewZoneAsync(JS, lineNumber, domRef);
+        if (zoneId is not null) _zoneIds[lineNumber] = zoneId;
+    }
+
+    private async Task CloseZoneAsync(int lineNumber)
+    {
+        if (!_zoneIds.TryGetValue(lineNumber, out var zoneId)) return;
+        await CodeUtils.RemoveZoneAsync(JS, zoneId);
+        _zoneIds.Remove(lineNumber);
     }
 
     private StandaloneEditorConstructionOptions BuildOptions(StandaloneCodeEditor _)
@@ -221,13 +245,7 @@
     private async Task ResizeZoneAsync(int lineNumber)
     {
         if (!_zoneIds.TryGetValue(lineNumber, out var zoneId)) return;
-        if (!_commentRefs.TryGetValue(lineNumber, out var domRef)) return;
-
-        await RunLogException(async () =>
-        {
-            await CodeUtils.UpdateZoneHeightAsync(JS, zoneId, domRef);
-            await CodeUtils.SyncOverlayAsync(JS);
-        });
+        await RunLogException(() => CodeUtils.UpdateZoneHeightAsync(JS, zoneId));
     }
 
     private async Task ClearZonesAndDecorationsAsync()

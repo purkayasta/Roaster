@@ -10,7 +10,7 @@ Return ONLY a valid JSON object with no markdown, no prose outside the JSON:
     { "fileName": "TheFile.cs", "lineNumber": 5, "comment": "Clear explanation of the issue and why it matters.", "severity": 10 }
   ]
 }
-Severity values: 10 = Should fix (real issue worth addressing), 20 = Must fix (bug, security hole, or serious design problem).
+Severity values: 10 = Should fix (real issue worth addressing), 20 = Must fix (bug, security hole, or serious design problem), 30 = Brutal (critical: data loss, crash, or exploitable vulnerability).
 fileName must always be set and must match the file header exactly (e.g. "main.cs").
 
 If no issues are found, return an empty comments array and a summary that genuinely acknowledges the code is well-written.

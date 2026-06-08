@@ -111,20 +111,16 @@ public sealed class CodeReviewService(
                 return;
             }
 
-            var firstFileName = files[0].FileName;
-            var comments = new List<ReviewLineComment>(aiResult.LineComments.Count);
-            foreach (var c in aiResult.LineComments)
-            {
-                if (c.FileName is null)
-                    logger.LogWarning("AI comment at line {Line} is missing FileName; defaulting to {File}", c.LineNumber, firstFileName);
-                comments.Add(new ReviewLineComment
+            var comments = aiResult.LineComments
+                .GroupBy(c => (FileName: ResolveFileName(c.FileName, files), c.LineNumber))
+                .Select(g => new ReviewLineComment
                 {
-                    FileName   = (c.FileName ?? firstFileName)!,
-                    LineNumber = c.LineNumber,
-                    Comment    = c.Comment,
-                    Severity   = (ReviewSeverity)c.Severity
-                });
-            }
+                    FileName   = g.Key.FileName,
+                    LineNumber = g.Key.LineNumber,
+                    Comment    = string.Join("\n\n", g.Select(x => x.Comment).Where(s => !string.IsNullOrWhiteSpace(s))),
+                    Severity   = (ReviewSeverity)g.Max(x => x.Severity)
+                })
+                .ToList();
             var review = new Review
             {
                 SubmissionId = submission.Id,
@@ -185,5 +181,19 @@ public sealed class CodeReviewService(
             await db.SaveChangesAsync(ct);
             throw;
         }
+    }
+
+    // Resolve the AI-reported file name to one of the submitted files so every
+    // comment maps to a real tab. Falls back to the first file when nothing matches.
+    private string ResolveFileName(string? aiName, IReadOnlyList<CodeFileInput> files)
+    {
+        if (!string.IsNullOrWhiteSpace(aiName))
+        {
+            var match = files.FirstOrDefault(f => f.FileName.Equals(aiName, StringComparison.OrdinalIgnoreCase))
+                     ?? files.FirstOrDefault(f => Path.GetFileName(f.FileName).Equals(Path.GetFileName(aiName), StringComparison.OrdinalIgnoreCase));
+            if (match is not null) return match.FileName;
+            logger.LogWarning("AI comment references unknown file {File}; defaulting to {Default}", aiName, files[0].FileName);
+        }
+        return files[0].FileName;
     }
 }

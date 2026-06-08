@@ -59,9 +59,9 @@ public static class CodeUtils
 
     public static Color GetSeverityColor(string severity) => severity.ToLowerInvariant() switch
     {
-        "error" => Color.Error,
-        "warning" => Color.Warning,
-        "info" => Color.Info,
+        "brutal" => Color.Error,
+        "medium" => Color.Warning,
+        "gentle" => Color.Info,
         _ => Color.Default
     };
 

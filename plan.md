@@ -90,4 +90,24 @@ Verified against `1.74.0-alpha`: `OllamaPromptExecutionSettings` exposes only
 - [ ] RAG over team coding standards (vector store + embedding model)
 - [ ] OpenTelemetry on model calls to enrich `ReviewMetrics`
 
+---
+
+## Source-Agnostic / PR Integration Track
+
+Making the system source-agnostic so GitHub and Azure DevOps PR reviews can be added
+as adapters without breaking the web editor. Full plan:
+[Extend-System-Plan.md](Documentations/Plans/Extend-System-Plan.md).
+
+| # | Phase | Status | Summary |
+|---|-------|--------|---------|
+| ES-1 | Source-aware pipeline | ⬜ Not started | Normalize request + carry `SourceType`/`SourceRef`; `IReviewDelivery` (Web) — editor unchanged |
+| ES-2 | Diff-aware review unit | ⬜ Not started | `CodeUnit` carries hunks + diff-position mapping |
+| ES-3 | GitHub adapter | ⬜ Not started | GitHub App webhook ingestion + inline PR review delivery |
+| ES-4 | Azure DevOps adapter | ⬜ Not started | Service-hook ingestion + PR-thread delivery |
+| ES-5 | Scale & hardening | ⬜ Not started | Chunk large PRs, horizontal workers, idempotency, model upgrade |
+
+The chunking strategy in ES-5 — preserving cross-file relationships while chunking for
+scale — is detailed in its own optimization plan:
+[Chunking-Optimization-Plan.md](Documentations/Plans/Chunking-Optimization-Plan.md) (phases CO-1…CO-6).
+
 Compression.

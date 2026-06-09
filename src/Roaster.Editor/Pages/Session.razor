@@ -43,7 +43,7 @@
         </MudStack>
 
         <MudStack Row="true" Style="flex:1; min-height:0;" Spacing="2">
-            <div style="flex:1; min-height:0; display:flex; flex-direction:column;">
+            <div style="flex:1; min-width:0; min-height:0; display:flex; flex-direction:column;">
                 @if (_isMultiFile)
                 {
                     <MultiCode SessionId="@_session.Id" SubmissionId="@_session.SubmissionId"

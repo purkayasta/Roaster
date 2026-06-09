@@ -107,11 +107,33 @@ samp {
     background: rgba(33, 150, 243, 0.08) !important;
 }
 
-/* ── Review comment box (rendered inside Monaco ViewZone) ───────────────── */
+/* ── Comment side panel + drag handle ───────────────────────────────────── */
+.roaster-comment-panel {
+    width: 420px;
+    flex: 0 0 auto;
+    min-width: 320px;
+    max-width: 720px;
+    overflow-y: auto;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--mud-palette-surface, #1e1e1e);
+    box-sizing: border-box;
+}
+
+.roaster-split-handle {
+    flex: 0 0 6px;
+    cursor: col-resize;
+    background: rgba(255, 255, 255, 0.06);
+    transition: background 0.15s;
+}
+
+.roaster-split-handle:hover {
+    background: var(--mud-palette-primary);
+}
+
+/* ── Review comment box ─────────────────────────────────────────────────── */
 .roaster-review-comment {
     padding: 8px 12px;
     font-size: 13px;
-    border-left: 3px solid #555;
     background: var(--mud-palette-surface, #1e1e1e);
     color: var(--mud-palette-text-primary, #d4d4d4);
     box-sizing: border-box;

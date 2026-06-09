@@ -93,23 +93,19 @@
             </MudAlert>
         }
 
-        <div style="position:relative; flex:1; min-height:0;">
-            <StandaloneCodeEditor @ref="_editor" Id="@CodeUtils.EditorId" ConstructionOptions="BuildOptions"
-                                  OnMouseDown="OnEditorMouseDown" />
+        <div style="display:flex; flex:1; min-height:0;">
+            <div style="flex:1; min-width:0; position:relative;">
+                <StandaloneCodeEditor @ref="_editor" Id="@CodeUtils.EditorId" ConstructionOptions="BuildOptions"
+                                      OnMouseDown="OnEditorMouseDown" />
+            </div>
 
-            @if (ActiveFileCommentCount > 0)
+            @if (SelectedComment is { } selected)
             {
-                @* Staging host: Blazor owns these nodes. Clicking a gutter dot moves the
-                   matching node into a native Monaco view zone (and back on close). *@
-                <div style="display:none;">
-                    @foreach (var comment in ActiveFileComments)
-                    {
-                        <div @key="comment.LineNumber" @ref="_commentRefs[comment.LineNumber]">
-                            <Comment SubmissionId="_submissionId!.Value" ReviewId="_review!.Id" CommentData="comment"
-                                     OnZoneResize="() => ResizeZoneAsync(comment.LineNumber)"
-                                     OnResolved="() => OnSingleCommentResolvedAsync(comment)" />
-                        </div>
-                    }
+                <div @ref="_handleRef" class="roaster-split-handle"></div>
+                <div @ref="_panelRef" class="roaster-comment-panel">
+                    <Comment SubmissionId="_submissionId!.Value" ReviewId="_review!.Id" CommentData="selected"
+                             OnClose="ClosePanel" OnResolved="() => OnSingleCommentResolvedAsync(selected)"
+                             @key="@($"{ActiveFile.FileName}:{selected.LineNumber}")" />
                 </div>
             }
         </div>
@@ -137,9 +133,11 @@
     private ReviewResponse? _review;
     private bool _reviewDirty;
     private bool _polling;
+    private int? _selectedLine;
+    private bool _splitterAttached;
 
-    private readonly Dictionary<int, ElementReference> _commentRefs = new();
-    private readonly Dictionary<int, string> _zoneIds = new();
+    private ElementReference _handleRef;
+    private ElementReference _panelRef;
     private string[] _decorationIds = [];
 
     private CancellationTokenSource? _pollingCts;
@@ -152,6 +150,11 @@
         _review is null ? [] : _review.Comments.Where(c => c.FileName == ActiveFile.FileName).ToList();
 
     private int ActiveFileCommentCount => _review is null ? 0 : ActiveFileComments.Count;
+
+    private ReviewCommentResponse? SelectedComment =>
+        _selectedLine is { } line
+            ? _review?.Comments.FirstOrDefault(c => c.FileName == ActiveFile.FileName && c.LineNumber == line)
+            : null;
 
     private sealed record TabBadge(int Count, string Color, string Tooltip);
 
@@ -219,11 +222,7 @@
                 _initialContents.Clear();
 
                 if (_review is not null)
-                {
-                    foreach (var c in ActiveFileComments)
-                        _commentRefs[c.LineNumber] = default;
-                    _reviewDirty = _commentRefs.Count > 0;
-                }
+                    _reviewDirty = ActiveFileComments.Count > 0;
                 StateHasChanged();
             }
             catch (Exception ex)
@@ -233,50 +232,42 @@
             return;
         }
 
+        if (_selectedLine is not null && !_splitterAttached)
+        {
+            _splitterAttached = true;
+            await RunLogException(() => CodeUtils.AttachSplitterAsync(JS, _handleRef, _panelRef));
+        }
+
         if (!_reviewDirty || _review is null) return;
         _reviewDirty = false;
 
         await RunLogException(async () =>
         {
-            await ClearZonesAndDecorationsAsync();
+            await ClearDecorationsAsync();
             var comments = ActiveFileComments;
             if (comments.Count == 0) return;
 
-            // Draw the clickable gutter dots; the comment boxes open on click.
+            // Draw the clickable gutter dots; clicking one opens the side panel.
             var args = comments.Select(c => new { lineNumber = c.LineNumber, severity = c.Severity }).ToArray();
             _decorationIds = await JS.InvokeAsync<string[]>("RoasterReview.addDecorations", CodeUtils.EditorId, args);
         });
     }
 
-    private async Task OnEditorMouseDown(EditorMouseEvent e)
+    private void OnEditorMouseDown(EditorMouseEvent e)
     {
         if (e.Target.Type != MouseTargetType.GUTTER_GLYPH_MARGIN) return;
         if (e.Target.Position is not { } pos) return;
-        if (!_commentRefs.ContainsKey(pos.LineNumber)) return;
-        await ToggleZoneAsync(pos.LineNumber);
+        if (!ActiveFileComments.Any(c => c.LineNumber == pos.LineNumber)) return;
+
+        // Toggle: clicking the active line's glyph again closes the panel.
+        _selectedLine = _selectedLine == pos.LineNumber ? null : pos.LineNumber;
+        StateHasChanged();
     }
 
-    private async Task ToggleZoneAsync(int lineNumber)
+    private void ClosePanel()
     {
-        if (_zoneIds.ContainsKey(lineNumber))
-            await CloseZoneAsync(lineNumber);
-        else
-            await OpenZoneAsync(lineNumber);
-    }
-
-    private async Task OpenZoneAsync(int lineNumber)
-    {
-        if (_zoneIds.ContainsKey(lineNumber)) return;
-        if (!_commentRefs.TryGetValue(lineNumber, out var domRef)) return;
-        var zoneId = await JS.InvokeAsync<string?>("RoasterReview.addZone", CodeUtils.EditorId, lineNumber, domRef);
-        if (zoneId is not null) _zoneIds[lineNumber] = zoneId;
-    }
-
-    private async Task CloseZoneAsync(int lineNumber)
-    {
-        if (!_zoneIds.TryGetValue(lineNumber, out var zoneId)) return;
-        await JS.InvokeVoidAsync("RoasterReview.removeZone", CodeUtils.EditorId, zoneId);
-        _zoneIds.Remove(lineNumber);
+        _selectedLine = null;
+        _splitterAttached = false;
     }
 
     // --- Editor construction ---
@@ -290,18 +281,14 @@
     {
         if (index == _activeIndex || index < 0 || index >= _files.Count) return;
 
-        await ClearZonesAndDecorationsAsync();
-        _commentRefs.Clear();
+        await ClearDecorationsAsync();
+        ClosePanel();
         _activeIndex = index;
 
         await JS.InvokeVoidAsync("RoasterModels.setActiveModel", CodeUtils.EditorId, ActiveFile.Id);
 
         if (_review is not null)
-        {
-            foreach (var c in ActiveFileComments)
-                _commentRefs[c.LineNumber] = default;
-            _reviewDirty = _commentRefs.Count > 0;
-        }
+            _reviewDirty = ActiveFileComments.Count > 0;
 
         StateHasChanged();
     }
@@ -344,8 +331,8 @@
             var nextIndex = index > 0 ? index - 1 : 1;
             _activeIndex = nextIndex;
             await JS.InvokeVoidAsync("RoasterModels.setActiveModel", CodeUtils.EditorId, _files[nextIndex].Id);
-            await ClearZonesAndDecorationsAsync();
-            _commentRefs.Clear();
+            await ClearDecorationsAsync();
+            ClosePanel();
         }
 
         _files.RemoveAt(index);
@@ -353,11 +340,7 @@
         await JS.InvokeVoidAsync("RoasterModels.disposeModel", file.Id);
 
         if (_review is not null)
-        {
-            foreach (var c in ActiveFileComments)
-                _commentRefs[c.LineNumber] = default;
-            _reviewDirty = _commentRefs.Count > 0;
-        }
+            _reviewDirty = ActiveFileComments.Count > 0;
 
         StateHasChanged();
     }
@@ -432,8 +415,8 @@
 
             _submissionId = result.Data!.Id;
             _review = null;
-            _commentRefs.Clear();
-            await ClearZonesAndDecorationsAsync();
+            ClosePanel();
+            await ClearDecorationsAsync();
             StateHasChanged();
             Snackbar.Add("Submitted for review!", Severity.Success);
             StartPolling(_submissionId.Value);
@@ -444,17 +427,10 @@
     {
         await RunLogException(async () =>
         {
-            // Close first so the node is restored to the staging host before Blazor
-            // removes its wrapper below.
-            await CloseZoneAsync(comment.LineNumber);
-            _commentRefs.Remove(comment.LineNumber);
             _review!.Comments.RemoveAll(c => c.LineNumber == comment.LineNumber && c.FileName == comment.FileName);
+            ClosePanel();
 
-            if (_decorationIds.Length > 0)
-            {
-                await JS.InvokeVoidAsync("RoasterReview.clearDecorations", CodeUtils.EditorId, _decorationIds);
-                _decorationIds = [];
-            }
+            await ClearDecorationsAsync();
             var remaining = ActiveFileComments;
             if (remaining.Count > 0)
             {
@@ -524,27 +500,12 @@
 
     private void ApplyReview(ReviewResponse review)
     {
-        _commentRefs.Clear();
-        foreach (var c in review.Comments.Where(c => c.FileName == ActiveFile.FileName))
-            _commentRefs[c.LineNumber] = default;
-
         _review = review;
-        _reviewDirty = _modelsInitialized && _commentRefs.Count > 0;
+        _reviewDirty = _modelsInitialized && ActiveFileComments.Count > 0;
     }
 
-    private async Task ResizeZoneAsync(int lineNumber)
+    private async Task ClearDecorationsAsync()
     {
-        if (!_zoneIds.TryGetValue(lineNumber, out var zoneId)) return;
-        await RunLogException(() => JS.InvokeVoidAsync("RoasterReview.updateZoneHeight", CodeUtils.EditorId, zoneId).AsTask());
-    }
-
-    private async Task ClearZonesAndDecorationsAsync()
-    {
-        if (_zoneIds.Count > 0)
-        {
-            await JS.InvokeVoidAsync("RoasterReview.removeZones", CodeUtils.EditorId, _zoneIds.Values.ToArray());
-            _zoneIds.Clear();
-        }
         if (_decorationIds.Length > 0)
         {
             await JS.InvokeVoidAsync("RoasterReview.clearDecorations", CodeUtils.EditorId, _decorationIds);
@@ -556,7 +517,7 @@
     {
         _pollingCts?.Cancel();
         _pollingCts?.Dispose();
-        await ClearZonesAndDecorationsAsync();
+        await ClearDecorationsAsync();
         try { await JS.InvokeVoidAsync("RoasterModels.disposeAll"); } catch { }
     }
 }

@@ -65,19 +65,7 @@ public static class CodeUtils
         _ => Color.Default
     };
 
-    // --- ViewZone / decoration interop ---
-
-    public static Task<string?> AddReviewZoneAsync(IJSRuntime js, int lineNumber, ElementReference domRef) =>
-        js.InvokeAsync<string?>("RoasterReview.addZone", EditorId, lineNumber, domRef).AsTask();
-
-    public static Task UpdateZoneHeightAsync(IJSRuntime js, string zoneId) =>
-        js.InvokeVoidAsync("RoasterReview.updateZoneHeight", EditorId, zoneId).AsTask();
-
-    public static Task RemoveZoneAsync(IJSRuntime js, string zoneId) =>
-        js.InvokeVoidAsync("RoasterReview.removeZone", EditorId, zoneId).AsTask();
-
-    public static Task RemoveZonesAsync(IJSRuntime js, IEnumerable<string> zoneIds) =>
-        js.InvokeVoidAsync("RoasterReview.removeZones", EditorId, zoneIds.ToArray()).AsTask();
+    // --- Decoration / layout interop ---
 
     public static Task<string[]> AddReviewDecorationsAsync(IJSRuntime js, IEnumerable<ReviewCommentResponse> comments)
     {
@@ -87,4 +75,7 @@ public static class CodeUtils
 
     public static Task ClearDecorationsAsync(IJSRuntime js, string[] decorationIds) =>
         js.InvokeVoidAsync("RoasterReview.clearDecorations", EditorId, decorationIds).AsTask();
+
+    public static Task AttachSplitterAsync(IJSRuntime js, ElementReference handle, ElementReference panel) =>
+        js.InvokeVoidAsync("RoasterSplit.attach", handle, panel, 320, 720).AsTask();
 }

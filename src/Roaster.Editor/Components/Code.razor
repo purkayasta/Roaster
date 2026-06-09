@@ -41,22 +41,18 @@
         </MudStack>
     </MudPaper>
 
-    <div style="position:relative; flex:1; min-height:0;">
-        <StandaloneCodeEditor @ref="_editor" Id="@CodeUtils.EditorId" ConstructionOptions="BuildOptions"
-                              OnMouseDown="OnEditorMouseDown" />
+    <div style="display:flex; flex:1; min-height:0;">
+        <div style="flex:1; min-width:0; position:relative;">
+            <StandaloneCodeEditor @ref="_editor" Id="@CodeUtils.EditorId" ConstructionOptions="BuildOptions"
+                                  OnMouseDown="OnEditorMouseDown" />
+        </div>
 
-        @if (_review is not null)
+        @if (SelectedComment is { } selected)
         {
-            @* Staging host: Blazor owns these nodes. Clicking a gutter dot moves the
-               matching node into a native Monaco view zone (and back on close). *@
-            <div style="display:none;">
-                @foreach (var comment in _review.Comments)
-                {
-                    <div @key="comment.LineNumber" @ref="_commentRefs[comment.LineNumber]">
-                        <Comment SubmissionId="_submissionId!.Value" ReviewId="_review.Id" CommentData="comment"
-                                 OnZoneResize="() => ResizeZoneAsync(comment.LineNumber)" OnResolved="OnCommentResolved" />
-                    </div>
-                }
+            <div @ref="_handleRef" class="roaster-split-handle"></div>
+            <div @ref="_panelRef" class="roaster-comment-panel">
+                <Comment SubmissionId="_submissionId!.Value" ReviewId="_review!.Id" CommentData="selected"
+                         OnClose="ClosePanel" OnResolved="HandleCommentResolvedAsync" @key="selected.LineNumber" />
             </div>
         }
     </div>
@@ -77,12 +73,17 @@
     private ReviewResponse? _review;
     private bool _reviewDirty;
     private bool _polling;
+    private int? _selectedLine;
+    private bool _splitterAttached;
 
-    private readonly Dictionary<int, ElementReference> _commentRefs = new();
-    private readonly Dictionary<int, string> _zoneIds = new();
+    private ElementReference _handleRef;
+    private ElementReference _panelRef;
     private string[] _decorationIds = [];
 
     private CancellationTokenSource? _pollingCts;
+
+    private ReviewCommentResponse? SelectedComment =>
+        _selectedLine is { } line ? _review?.Comments.FirstOrDefault(c => c.LineNumber == line) : null;
 
     protected override async Task OnInitializedAsync()
     {
@@ -104,48 +105,40 @@
     {
         await base.OnAfterRenderAsync(firstRender);
 
+        if (_selectedLine is not null && !_splitterAttached)
+        {
+            _splitterAttached = true;
+            await RunLogException(() => CodeUtils.AttachSplitterAsync(JS, _handleRef, _panelRef));
+        }
+
         if (!_reviewDirty || _review is null) return;
         _reviewDirty = false;
 
         await RunLogException(async () =>
         {
-            await ClearZonesAndDecorationsAsync();
+            await ClearDecorationsAsync();
             if (_review.Comments.Count == 0) return;
 
-            // Draw the clickable gutter dots; the comment boxes open on click.
+            // Draw the clickable gutter dots; clicking one opens the side panel.
             _decorationIds = await CodeUtils.AddReviewDecorationsAsync(JS, _review.Comments);
         });
     }
 
-    private async Task OnEditorMouseDown(EditorMouseEvent e)
+    private void OnEditorMouseDown(EditorMouseEvent e)
     {
         if (e.Target.Type != MouseTargetType.GUTTER_GLYPH_MARGIN) return;
         if (e.Target.Position is not { } pos) return;
-        if (!_commentRefs.ContainsKey(pos.LineNumber)) return;
-        await ToggleZoneAsync(pos.LineNumber);
+        if (_review?.Comments.Any(c => c.LineNumber == pos.LineNumber) != true) return;
+
+        // Toggle: clicking the active line's glyph again closes the panel.
+        _selectedLine = _selectedLine == pos.LineNumber ? null : pos.LineNumber;
+        StateHasChanged();
     }
 
-    private async Task ToggleZoneAsync(int lineNumber)
+    private void ClosePanel()
     {
-        if (_zoneIds.ContainsKey(lineNumber))
-            await CloseZoneAsync(lineNumber);
-        else
-            await OpenZoneAsync(lineNumber);
-    }
-
-    private async Task OpenZoneAsync(int lineNumber)
-    {
-        if (_zoneIds.ContainsKey(lineNumber)) return;
-        if (!_commentRefs.TryGetValue(lineNumber, out var domRef)) return;
-        var zoneId = await CodeUtils.AddReviewZoneAsync(JS, lineNumber, domRef);
-        if (zoneId is not null) _zoneIds[lineNumber] = zoneId;
-    }
-
-    private async Task CloseZoneAsync(int lineNumber)
-    {
-        if (!_zoneIds.TryGetValue(lineNumber, out var zoneId)) return;
-        await CodeUtils.RemoveZoneAsync(JS, zoneId);
-        _zoneIds.Remove(lineNumber);
+        _selectedLine = null;
+        _splitterAttached = false;
     }
 
     private StandaloneEditorConstructionOptions BuildOptions(StandaloneCodeEditor _)
@@ -172,8 +165,8 @@
 
             _submissionId = result.Data!.Id;
             _review = null;
-            _commentRefs.Clear();
-            await ClearZonesAndDecorationsAsync();
+            ClosePanel();
+            await ClearDecorationsAsync();
             StateHasChanged();
             Snackbar.Add("Submitted for review!", Severity.Success);
             StartPolling(_submissionId.Value);
@@ -234,27 +227,29 @@
 
     private void ApplyReview(ReviewResponse review)
     {
-        _commentRefs.Clear();
-        foreach (var c in review.Comments)
-            _commentRefs[c.LineNumber] = default;
-
         _review = review;
         _reviewDirty = true;
     }
 
-    private async Task ResizeZoneAsync(int lineNumber)
+    private async Task HandleCommentResolvedAsync()
     {
-        if (!_zoneIds.TryGetValue(lineNumber, out var zoneId)) return;
-        await RunLogException(() => CodeUtils.UpdateZoneHeightAsync(JS, zoneId));
+        if (SelectedComment is { } resolved)
+            _review?.Comments.RemoveAll(c => c.LineNumber == resolved.LineNumber);
+
+        ClosePanel();
+
+        await RunLogException(async () =>
+        {
+            await ClearDecorationsAsync();
+            if (_review is { Comments.Count: > 0 })
+                _decorationIds = await CodeUtils.AddReviewDecorationsAsync(JS, _review.Comments);
+        });
+
+        await OnCommentResolved.InvokeAsync();
     }
 
-    private async Task ClearZonesAndDecorationsAsync()
+    private async Task ClearDecorationsAsync()
     {
-        if (_zoneIds.Count > 0)
-        {
-            await CodeUtils.RemoveZonesAsync(JS, _zoneIds.Values);
-            _zoneIds.Clear();
-        }
         if (_decorationIds.Length > 0)
         {
             await CodeUtils.ClearDecorationsAsync(JS, _decorationIds);
@@ -266,6 +261,6 @@
     {
         _pollingCts?.Cancel();
         _pollingCts?.Dispose();
-        await ClearZonesAndDecorationsAsync();
+        await ClearDecorationsAsync();
     }
 }

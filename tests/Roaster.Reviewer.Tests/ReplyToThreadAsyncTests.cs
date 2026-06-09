@@ -18,7 +18,7 @@ public sealed class ReplyToThreadAsyncTests
 {
     private static AiReviewService BuildService(
         Mock<IChatCompletionService> chatMock)
-        => new(chatMock.Object, NullLogger<AiReviewService>.Instance);
+        => new([], chatMock.Object, NullLogger<AiReviewService>.Instance);
 
     private static void SetupChatReply(Mock<IChatCompletionService> mock, string reply)
     {

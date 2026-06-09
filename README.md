@@ -36,7 +36,7 @@ Roaster is an AI-powered code review tool that gives you brutally honest, inline
 src/
   Roaster.Api          — HTTP endpoints, validation, event publishing
   Roaster.Consumer     — RabbitMQ consumer, orchestrates AI review flow
-  Roaster.Reviewer     — Semantic Kernel + Ollama integration
+  Roaster.Reviewer     — Multi-agent reviewer (Security/Bug/Syntax) on Semantic Kernel + Ollama
   Roaster.Data         — EF Core DbContext and entity configs
   Roaster.Contracts    — Shared events and DTOs
   Roaster.Migration    — DbUp console app, runs SQL scripts on startup

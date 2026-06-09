@@ -28,7 +28,7 @@ public sealed class CodeReviewService(
     {
         logger.LogInformation("Processing SubmissionCreatedEvent for submission {Id}", msg.SubmissionId);
 
-        var submission = await db.Submissions.FindAsync(new object?[] { msg.SubmissionId, ct }, cancellationToken: ct);
+        var submission = await db.Submissions.FindAsync([msg.SubmissionId], ct);
         if (submission is null)
         {
             logger.LogWarning("Submission {Id} not found — discarding", msg.SubmissionId);
@@ -62,11 +62,33 @@ public sealed class CodeReviewService(
 
         try
         {
-            logger.LogInformation("Calling AI review for submission {Id}, language {Language}, code length {Length} chars",
-                msg.SubmissionId, submission.Payload.Language, submission.Payload.Content.Length);
+            var files = submission.Payloads
+                .Select(f => new CodeFileInput(f.FileName, f.Content, f.Language))
+                .ToList();
 
-            var aiResult = await ai.ReviewCodeAsync(
-                submission.Payload.Content, submission.Payload.Language, ct);
+            if (files.Count == 0)
+            {
+                var noFilesMsg = $"No files to review for submission {msg.SubmissionId}";
+                logger.LogWarning(noFilesMsg);
+                submission.Status = SubmissionStatus.Failed;
+                db.Events.Add(new Event
+                {
+                    SubmissionId = submission.Id,
+                    SessionId = submission.SessionId,
+                    EventType = EventType.Failed,
+                    CorrelationId = msg.CorrelationId,
+                    Metadata = JsonSerializer.Serialize(new { message = noFilesMsg }),
+                    OccurredAt = DateTime.UtcNow
+                });
+                await db.SaveChangesAsync(ct);
+                return;
+            }
+
+            var totalChars = files.Sum(f => f.Content.Length);
+            logger.LogInformation("Calling AI review for submission {Id}, {FileCount} file(s), {TotalChars} total chars",
+                msg.SubmissionId, files.Count, totalChars);
+
+            var aiResult = await ai.ReviewCodeAsync(files, ct);
 
             logger.LogInformation("AI review completed for submission {Id} in {ElapsedMs}ms, status {Status}, {CommentCount} comments",
                 msg.SubmissionId, stopwatch.ElapsedMilliseconds, aiResult.Status, aiResult.LineComments.Count);
@@ -89,16 +111,21 @@ public sealed class CodeReviewService(
                 return;
             }
 
+            var comments = aiResult.LineComments
+                .GroupBy(c => (FileName: ResolveFileName(c.FileName, files), c.LineNumber))
+                .Select(g => new ReviewLineComment
+                {
+                    FileName   = g.Key.FileName,
+                    LineNumber = g.Key.LineNumber,
+                    Comment    = string.Join("\n\n", g.Select(x => x.Comment).Where(s => !string.IsNullOrWhiteSpace(s))),
+                    Severity   = (ReviewSeverity)g.Max(x => x.Severity)
+                })
+                .ToList();
             var review = new Review
             {
                 SubmissionId = submission.Id,
-                Summary = null,
-                Comments = aiResult.LineComments.Select(c => new ReviewLineComment
-                {
-                    LineNumber = c.LineNumber,
-                    Comment = c.Comment,
-                    Severity = (ReviewSeverity)c.Severity
-                }).ToList(),
+                Summary = aiResult.Summary,
+                Comments = comments,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -116,7 +143,7 @@ public sealed class CodeReviewService(
                 ReviewDurationMs = (int)stopwatch.Elapsed.TotalMilliseconds,
                 TotalDurationMs = (int)(DateTime.UtcNow - msg.SubmittedAt).TotalMilliseconds,
                 CommentCount = review.Comments.Count,
-                CodeLengthChars = submission.Payload.Content.Length,
+                CodeLengthChars = totalChars,
                 CreatedAt = DateTime.UtcNow
             });
 
@@ -154,5 +181,19 @@ public sealed class CodeReviewService(
             await db.SaveChangesAsync(ct);
             throw;
         }
+    }
+
+    // Resolve the AI-reported file name to one of the submitted files so every
+    // comment maps to a real tab. Falls back to the first file when nothing matches.
+    private string ResolveFileName(string? aiName, IReadOnlyList<CodeFileInput> files)
+    {
+        if (!string.IsNullOrWhiteSpace(aiName))
+        {
+            var match = files.FirstOrDefault(f => f.FileName.Equals(aiName, StringComparison.OrdinalIgnoreCase))
+                     ?? files.FirstOrDefault(f => Path.GetFileName(f.FileName).Equals(Path.GetFileName(aiName), StringComparison.OrdinalIgnoreCase));
+            if (match is not null) return match.FileName;
+            logger.LogWarning("AI comment references unknown file {File}; defaulting to {Default}", aiName, files[0].FileName);
+        }
+        return files[0].FileName;
     }
 }

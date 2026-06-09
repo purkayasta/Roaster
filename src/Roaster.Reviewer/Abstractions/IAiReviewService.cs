@@ -10,8 +10,7 @@ namespace Roaster.Reviewer.Abstractions;
 public interface IAiReviewService
 {
     Task<ReviewerResult> ReviewCodeAsync(
-        string code,
-        string language,
+        IReadOnlyList<CodeFileInput> files,
         CancellationToken ct = default);
 
     Task<string> ReplyToThreadAsync(

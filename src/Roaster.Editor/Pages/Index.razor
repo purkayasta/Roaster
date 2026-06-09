@@ -30,6 +30,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await base.OnInitializedAsync();
+
         await RunLogException(async () =>
         {
             var result = await SessionService.GetAllAsync(pageSize: 50);
@@ -44,21 +46,32 @@
     {
         var dialog = await DialogService.ShowAsync<NewSessionDialog>("New Code Session");
         var result = await dialog.Result;
-        if (result is { Canceled: false, Data: string name })
+        if (result is { Canceled: false, Data: NewSessionResult newSession })
         {
             await RunLogException(async () =>
             {
-                var response = await SessionService.CreateAsync(name);
+                var response = await SessionService.CreateAsync(newSession.Name, newSession.IsMulti);
                 if (response.IsSuccess)
-                    Navigation.NavigateTo($"/session/{response.Data!.Id}");
+                {
+                    var url = newSession.IsMulti
+                        ? $"/session/{response.Data!.Id}?mode=multi"
+                        : $"/session/{response.Data!.Id}";
+                    Navigation.NavigateTo(url);
+                }
                 else
                     Snackbar.Add(response.Error ?? $"Failed to create session ({response.StatusCode}).", Severity.Error);
             });
         }
     }
 
-    private void EditSessionAsync(Guid sessionId) =>
-        Navigation.NavigateTo($"/session/{sessionId}");
+    private void EditSessionAsync(Guid sessionId)
+    {
+        var session = _sessions.FirstOrDefault(s => s.SessionId == sessionId);
+        var url = session?.IsMultiFile == true
+            ? $"/session/{sessionId}?mode=multi"
+            : $"/session/{sessionId}";
+        Navigation.NavigateTo(url);
+    }
 
     private async Task DeleteSessionAsync(Guid sessionId)
     {

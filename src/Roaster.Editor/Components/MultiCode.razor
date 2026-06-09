@@ -1,0 +1,523 @@
+@inherits EditorComponentBase
+@inject IJSRuntime JS
+@inject SubmissionService SubmissionService
+@inject ReviewService ReviewService
+@implements IAsyncDisposable
+
+<div style="position:relative; height:100%;">
+    @if (!_modelsInitialized)
+    {
+        <div
+            style="position:absolute; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.4);">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
+        </div>
+    }
+    <MudStack Spacing="0" Style="height: 100%;">
+        <div class="roaster-tab-bar">
+            @foreach (var (file, i) in _files.Select((f, idx) => (f, idx)))
+            {
+                var capturedI = i;
+                var badge = GetTabBadge(file);
+                <div @key="file.Id" class="roaster-tab @(i == _activeIndex ? "roaster-tab-active" : "")"
+                     @onclick="() => SwitchTabAsync(capturedI)">
+                    @if (_renamingIndex == i)
+                    {
+                        <MudTextField @ref="_renameField" @bind-Value="file.FileName" Immediate="true" Margin="Margin.Dense"
+                                      Variant="Variant.Text" Style="width:120px; font-size:12px;" @onclick:stopPropagation="true"
+                                      @onblur="StopRenaming" @onkeyup="OnRenameKeyUp" />
+                    }
+                    else
+                    {
+                        <span @ondblclick="() => StartRenaming(capturedI)" style="padding:0 2px;">@file.FileName</span>
+                        @if (badge is not null)
+                        {
+                            <span class="roaster-tab-badge" style="background:@badge.Color"
+                                  title="@badge.Tooltip">@badge.Count</span>
+                        }
+                    }
+                    @if (_files.Count > 1)
+                    {
+                        <span @onclick:stopPropagation="true" @onclick="() => RemoveTabAsync(capturedI)"
+                              style="display:inline-flex; align-items:center; opacity:0.6; cursor:pointer; padding:0 2px;"
+                              title="Close">×</span>
+                    }
+                </div>
+            }
+            <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small" OnClick="AddTabAsync"
+                           Style="padding:4px;" />
+        </div>
+
+        <MudPaper Elevation="1" Class="px-3 py-2" Style="border-radius:0;">
+            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                <MudSelect T="string" @bind-Value="ActiveFile.Language" @bind-Value:after="OnLanguageChangedAsync"
+                           Dense="true" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:160px;"
+                           Label="Language">
+                    @foreach (var lang in CodeUtils.Languages)
+                    {
+                        <MudSelectItem Value="@lang">@lang</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="string" @bind-Value="_theme" @bind-Value:after="() => OnThemeChangedAsync(_theme)"
+                           Dense="true" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:150px;"
+                           Label="Theme">
+                    @foreach (var (key, label) in CodeUtils.Themes)
+                    {
+                        <MudSelectItem Value="@key">@label</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSpacer />
+                @if (ActiveFileCommentCount > 0)
+                {
+                    <MudTooltip Text="@_review!.Summary">
+                        <MudChip T="string" Color="Color.Success" Variant="Variant.Outlined" Size="Size.Small">
+                            @CommentLabel(ActiveFileCommentCount)
+                        </MudChip>
+                    </MudTooltip>
+                }
+                @if (_polling)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" />
+                }
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.RateReview"
+                           OnClick="SubmitForReviewAsync" Disabled="Running || _polling || !_modelsInitialized">
+                    Review
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+
+        @if (_review?.Summary is { Length: > 0 } summary)
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" Square="true" ShowCloseIcon="true"
+                      CloseIconClicked="() => _review = _review with { Summary = null }">
+                @summary
+            </MudAlert>
+        }
+
+        <div style="display:flex; flex:1; min-height:0;">
+            <div style="flex:1; min-width:0; position:relative;">
+                <StandaloneCodeEditor @ref="_editor" Id="@CodeUtils.EditorId" ConstructionOptions="BuildOptions"
+                                      OnMouseDown="OnEditorMouseDown" />
+            </div>
+
+            @if (SelectedComment is { } selected)
+            {
+                <div @ref="_handleRef" class="roaster-split-handle"></div>
+                <div @ref="_panelRef" class="roaster-comment-panel">
+                    <Comment SubmissionId="_submissionId!.Value" ReviewId="_review!.Id" CommentData="selected"
+                             OnClose="ClosePanel" OnResolved="() => OnSingleCommentResolvedAsync(selected)"
+                             @key="@($"{ActiveFile.FileName}:{selected.LineNumber}")" />
+                </div>
+            }
+        </div>
+    </MudStack>
+</div>
+
+@code {
+    [Parameter] public Guid SessionId { get; set; }
+    [Parameter] public long? SubmissionId { get; set; }
+    [Parameter] public List<PayloadResponse> Payloads { get; set; } = [];
+    [Parameter] public EventCallback OnCommentResolved { get; set; }
+
+    private StandaloneCodeEditor _editor = null!;
+    private MudTextField<string>? _renameField;
+    private string _theme = CodeUtils.DefaultTheme;
+
+    private readonly List<EditorFile> _files = [new EditorFile()];
+    private int _activeIndex;
+    private int _renamingIndex = -1;
+    private string? _renamingOldFileName;
+    private readonly Dictionary<string, string> _initialContents = new();
+    private bool _modelsInitialized;
+
+    private long? _submissionId;
+    private ReviewResponse? _review;
+    private bool _reviewDirty;
+    private bool _polling;
+    private int? _selectedLine;
+    private bool _splitterAttached;
+
+    private ElementReference _handleRef;
+    private ElementReference _panelRef;
+    private string[] _decorationIds = [];
+
+    private CancellationTokenSource? _pollingCts;
+
+    // --- View helpers ---
+
+    private EditorFile ActiveFile => _files[_activeIndex];
+
+    private List<ReviewCommentResponse> ActiveFileComments =>
+        _review is null ? [] : _review.Comments.Where(c => c.FileName == ActiveFile.FileName).ToList();
+
+    private int ActiveFileCommentCount => _review is null ? 0 : ActiveFileComments.Count;
+
+    private ReviewCommentResponse? SelectedComment =>
+        _selectedLine is { } line
+            ? _review?.Comments.FirstOrDefault(c => c.FileName == ActiveFile.FileName && c.LineNumber == line)
+            : null;
+
+    private sealed record TabBadge(int Count, string Color, string Tooltip);
+
+    private TabBadge? GetTabBadge(EditorFile file)
+    {
+        if (_review is null) return null;
+        var count = _review.Comments.Count(c => c.FileName == file.FileName);
+        if (count == 0) return null;
+        var hasBrutal = _review.Comments.Any(c => c.FileName == file.FileName && c.Severity == "Brutal");
+        var color = hasBrutal ? "var(--mud-palette-error)" : "var(--mud-palette-warning)";
+        return new TabBadge(count, color, CommentLabel(count));
+    }
+
+    private static string CommentLabel(int count) => $"{count} comment{(count == 1 ? "" : "s")}";
+
+    // --- Lifecycle ---
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        if (Payloads.Count > 0)
+        {
+            _files.Clear();
+            foreach (var p in Payloads)
+            {
+                var file = new EditorFile
+                {
+                    FileName = p.FileName ?? LanguageExtensionMap.DefaultFileName(p.Language ?? CodeUtils.DefaultLanguage),
+                    Language = p.Language ?? CodeUtils.DefaultLanguage
+                };
+                _files.Add(file);
+                _initialContents[file.Id] = p.Content ?? string.Empty;
+            }
+        }
+
+        try { await ThemeFactory.EnsureAllAsync(JS); } catch { }
+
+        if (SubmissionId is { } id)
+        {
+            _submissionId = id;
+            await TryLoadReviewAsync(id);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (!_modelsInitialized)
+        {
+            try
+            {
+                var ready = await JS.InvokeAsync<bool>("RoasterModels.isEditorReady", CodeUtils.EditorId);
+                if (!ready) { StateHasChanged(); return; }
+
+                foreach (var file in _files)
+                {
+                    var content = _initialContents.TryGetValue(file.Id, out var c) ? c : CodeUtils.DefaultBoilerplate;
+                    await JS.InvokeVoidAsync("RoasterModels.createModel", file.Id, content, file.Language);
+                }
+                await JS.InvokeVoidAsync("RoasterModels.setActiveModel", CodeUtils.EditorId, ActiveFile.Id);
+
+                _modelsInitialized = true;
+                _initialContents.Clear();
+
+                if (_review is not null)
+                    _reviewDirty = ActiveFileComments.Count > 0;
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Failed to initialize editor: {ex.Message}", Severity.Error);
+            }
+            return;
+        }
+
+        if (_selectedLine is not null && !_splitterAttached)
+        {
+            _splitterAttached = true;
+            await RunLogException(() => CodeUtils.AttachSplitterAsync(JS, _handleRef, _panelRef));
+        }
+
+        if (!_reviewDirty || _review is null) return;
+        _reviewDirty = false;
+
+        await RunLogException(async () =>
+        {
+            await ClearDecorationsAsync();
+            var comments = ActiveFileComments;
+            if (comments.Count == 0) return;
+
+            // Draw the clickable gutter dots; clicking one opens the side panel.
+            var args = comments.Select(c => new { lineNumber = c.LineNumber, severity = c.Severity }).ToArray();
+            _decorationIds = await JS.InvokeAsync<string[]>("RoasterReview.addDecorations", CodeUtils.EditorId, args);
+        });
+    }
+
+    private void OnEditorMouseDown(EditorMouseEvent e)
+    {
+        if (e.Target.Type != MouseTargetType.GUTTER_GLYPH_MARGIN) return;
+        if (e.Target.Position is not { } pos) return;
+        if (!ActiveFileComments.Any(c => c.LineNumber == pos.LineNumber)) return;
+
+        // Toggle: clicking the active line's glyph again closes the panel.
+        _selectedLine = _selectedLine == pos.LineNumber ? null : pos.LineNumber;
+        StateHasChanged();
+    }
+
+    private void ClosePanel()
+    {
+        _selectedLine = null;
+        _splitterAttached = false;
+    }
+
+    // --- Editor construction ---
+
+    private StandaloneEditorConstructionOptions BuildOptions(StandaloneCodeEditor _) =>
+        CodeUtils.BuildEditorOptions(_files[0].Language, _theme);
+
+    // --- Tab management ---
+
+    private async Task SwitchTabAsync(int index)
+    {
+        if (index == _activeIndex || index < 0 || index >= _files.Count) return;
+
+        await ClearDecorationsAsync();
+        ClosePanel();
+        _activeIndex = index;
+
+        await JS.InvokeVoidAsync("RoasterModels.setActiveModel", CodeUtils.EditorId, ActiveFile.Id);
+
+        if (_review is not null)
+            _reviewDirty = ActiveFileComments.Count > 0;
+
+        StateHasChanged();
+    }
+
+    private string NextUntitledName(string language)
+    {
+        var ext = LanguageExtensionMap.GetExtension(language);
+        const string prefix = "untitled-";
+        var max = 0;
+        foreach (var f in _files)
+        {
+            var baseName = Path.GetFileNameWithoutExtension(f.FileName);
+            if (baseName.StartsWith(prefix, StringComparison.Ordinal) &&
+                int.TryParse(baseName[prefix.Length..], out var n))
+                max = Math.Max(max, n);
+        }
+        return $"{prefix}{max + 1}{ext}";
+    }
+
+    private async Task AddTabAsync()
+    {
+        var file = new EditorFile
+        {
+            Language = ActiveFile.Language,
+            FileName = NextUntitledName(ActiveFile.Language)
+        };
+        _files.Add(file);
+        await JS.InvokeVoidAsync("RoasterModels.createModel", file.Id, CodeUtils.DefaultBoilerplate, file.Language);
+        await SwitchTabAsync(_files.Count - 1);
+    }
+
+    private async Task RemoveTabAsync(int index)
+    {
+        if (_files.Count <= 1 || index < 0 || index >= _files.Count) return;
+
+        var file = _files[index];
+
+        if (index == _activeIndex)
+        {
+            var nextIndex = index > 0 ? index - 1 : 1;
+            _activeIndex = nextIndex;
+            await JS.InvokeVoidAsync("RoasterModels.setActiveModel", CodeUtils.EditorId, _files[nextIndex].Id);
+            await ClearDecorationsAsync();
+            ClosePanel();
+        }
+
+        _files.RemoveAt(index);
+        if (_activeIndex > index) _activeIndex--;
+        await JS.InvokeVoidAsync("RoasterModels.disposeModel", file.Id);
+
+        if (_review is not null)
+            _reviewDirty = ActiveFileComments.Count > 0;
+
+        StateHasChanged();
+    }
+
+    private void StartRenaming(int index)
+    {
+        _renamingIndex = index;
+        _renamingOldFileName = _files[index].FileName;
+    }
+
+    private void StopRenaming()
+    {
+        if (_renamingIndex < 0) return;
+        var file = _files[_renamingIndex];
+        if (string.IsNullOrWhiteSpace(file.FileName))
+            file.FileName = NextUntitledName(file.Language);
+
+        if (_files.Where((f, i) => i != _renamingIndex).Any(f => f.FileName == file.FileName))
+            file.FileName = _renamingOldFileName ?? NextUntitledName(file.Language);
+
+        if (_review is not null && _renamingOldFileName != file.FileName)
+        {
+            for (var i = 0; i < _review.Comments.Count; i++)
+            {
+                if (_review.Comments[i].FileName == _renamingOldFileName)
+                    _review.Comments[i] = _review.Comments[i] with { FileName = file.FileName };
+            }
+        }
+
+        _renamingOldFileName = null;
+        _renamingIndex = -1;
+    }
+
+    private void OnRenameKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key is "Enter" or "Escape") StopRenaming();
+    }
+
+    // --- Editor state ---
+
+    private async Task OnLanguageChangedAsync()
+    {
+        var language = ActiveFile.Language;
+        ActiveFile.FileName = LanguageExtensionMap.SwapExtension(ActiveFile.FileName, language);
+        await JS.InvokeVoidAsync("RoasterModels.setModelLanguage", ActiveFile.Id, language);
+    }
+
+    private async Task OnThemeChangedAsync(string theme) =>
+        await CodeUtils.SetThemeAsync(JS, theme);
+
+    // --- Review ---
+
+    private async Task SubmitForReviewAsync()
+    {
+        await RunLogException(async () =>
+        {
+            var fileRequests = new List<FileSubmissionRequest>();
+            foreach (var file in _files)
+            {
+                var content = file == ActiveFile
+                    ? await JS.InvokeAsync<string>("RoasterModels.getEditorValue", CodeUtils.EditorId)
+                    : await JS.InvokeAsync<string>("RoasterModels.getModelValue", file.Id);
+                fileRequests.Add(new FileSubmissionRequest(file.FileName, content, file.Language));
+            }
+
+            var result = await SubmissionService.SubmitAsync(SessionId, fileRequests);
+            if (!result.IsSuccess)
+            {
+                Snackbar.Add(result.Error ?? $"Request failed ({result.StatusCode}).", Severity.Error);
+                return;
+            }
+
+            _submissionId = result.Data!.Id;
+            _review = null;
+            ClosePanel();
+            await ClearDecorationsAsync();
+            StateHasChanged();
+            Snackbar.Add("Submitted for review!", Severity.Success);
+            StartPolling(_submissionId.Value);
+        });
+    }
+
+    private async Task OnSingleCommentResolvedAsync(ReviewCommentResponse comment)
+    {
+        await RunLogException(async () =>
+        {
+            _review!.Comments.RemoveAll(c => c.LineNumber == comment.LineNumber && c.FileName == comment.FileName);
+            ClosePanel();
+
+            await ClearDecorationsAsync();
+            var remaining = ActiveFileComments;
+            if (remaining.Count > 0)
+            {
+                var args = remaining.Select(c => new { lineNumber = c.LineNumber, severity = c.Severity }).ToArray();
+                _decorationIds = await JS.InvokeAsync<string[]>("RoasterReview.addDecorations", CodeUtils.EditorId, args);
+            }
+
+            await OnCommentResolved.InvokeAsync();
+        });
+    }
+
+    private async Task TryLoadReviewAsync(long submissionId)
+    {
+        await RunLogException(async () =>
+        {
+            var result = await ReviewService.GetReviewAsync(submissionId);
+            if (result.StatusCode == 200 && result.Data is not null)
+                ApplyReview(result.Data);
+        });
+    }
+
+    private void StartPolling(long submissionId)
+    {
+        _pollingCts?.Cancel();
+        _pollingCts = new CancellationTokenSource();
+        _ = PollForReviewAsync(submissionId, _pollingCts.Token);
+    }
+
+    private async Task PollForReviewAsync(long submissionId, CancellationToken ct)
+    {
+        _polling = true;
+        StateHasChanged();
+
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(ct))
+            {
+                var result = await ReviewService.GetReviewAsync(submissionId, ct);
+                if (result.StatusCode == 200 && result.Data is not null)
+                {
+                    _polling = false;
+                    ApplyReview(result.Data);
+                    StateHasChanged();
+                    return;
+                }
+                if (!result.IsSuccess && result.StatusCode != 204)
+                {
+                    _polling = false;
+                    Snackbar.Add(result.Error ?? "Review polling failed.", Severity.Error);
+                    StateHasChanged();
+                    return;
+                }
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Review polling failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _polling = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ApplyReview(ReviewResponse review)
+    {
+        _review = review;
+        _reviewDirty = _modelsInitialized && ActiveFileComments.Count > 0;
+    }
+
+    private async Task ClearDecorationsAsync()
+    {
+        if (_decorationIds.Length > 0)
+        {
+            await JS.InvokeVoidAsync("RoasterReview.clearDecorations", CodeUtils.EditorId, _decorationIds);
+            _decorationIds = [];
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _pollingCts?.Cancel();
+        _pollingCts?.Dispose();
+        await ClearDecorationsAsync();
+        try { await JS.InvokeVoidAsync("RoasterModels.disposeAll"); } catch { }
+    }
+}

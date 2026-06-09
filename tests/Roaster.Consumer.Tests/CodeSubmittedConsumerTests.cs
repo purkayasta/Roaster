@@ -54,7 +54,7 @@ public sealed class ReviewProcessorTests : IDisposable
         var sub = new Submission
         {
             SessionId = session.Id,
-            Payload   = new CodePayload { Content = "var x = 1;", Language = "csharp" },
+            Payloads  = [new Payload { FileName = "main.cs", Content = "var x = 1;", Language = "csharp" }],
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -74,7 +74,7 @@ public sealed class ReviewProcessorTests : IDisposable
     public async Task HappyPath_StatusCyclesPendingToCompleted()
     {
         var sub = await SeedSubmission();
-        _ai.Setup(a => a.ReviewCodeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _ai.Setup(a => a.ReviewCodeAsync(It.IsAny<IReadOnlyList<CodeFileInput>>(), It.IsAny<CancellationToken>()))
            .ReturnsAsync(new ReviewerResult(ReviewStatus.Success, []));
 
         var ctx = FakeConsumeContext.For(new SubmissionCreatedEvent(sub.Id, Guid.NewGuid(), DateTime.UtcNow));
@@ -88,7 +88,7 @@ public sealed class ReviewProcessorTests : IDisposable
     public async Task HappyPath_ReviewAndMetricsSaved()
     {
         var sub = await SeedSubmission();
-        _ai.Setup(a => a.ReviewCodeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _ai.Setup(a => a.ReviewCodeAsync(It.IsAny<IReadOnlyList<CodeFileInput>>(), It.IsAny<CancellationToken>()))
            .ReturnsAsync(new ReviewerResult(ReviewStatus.Success, [new AiLineComment(3, "use const", 10)]));
 
         var ctx = FakeConsumeContext.For(new SubmissionCreatedEvent(sub.Id, Guid.NewGuid(), DateTime.UtcNow));
@@ -104,7 +104,7 @@ public sealed class ReviewProcessorTests : IDisposable
     public async Task HappyPath_EventsWritten()
     {
         var sub = await SeedSubmission();
-        _ai.Setup(a => a.ReviewCodeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _ai.Setup(a => a.ReviewCodeAsync(It.IsAny<IReadOnlyList<CodeFileInput>>(), It.IsAny<CancellationToken>()))
            .ReturnsAsync(new ReviewerResult(ReviewStatus.Success, []));
 
         var ctx = FakeConsumeContext.For(new SubmissionCreatedEvent(sub.Id, Guid.NewGuid(), DateTime.UtcNow));
@@ -119,7 +119,7 @@ public sealed class ReviewProcessorTests : IDisposable
     public async Task HappyPath_ReviewCompletedEventPublished()
     {
         var sub = await SeedSubmission();
-        _ai.Setup(a => a.ReviewCodeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _ai.Setup(a => a.ReviewCodeAsync(It.IsAny<IReadOnlyList<CodeFileInput>>(), It.IsAny<CancellationToken>()))
            .ReturnsAsync(new ReviewerResult(ReviewStatus.Success, []));
 
         var ctx = FakeConsumeContext.For(new SubmissionCreatedEvent(sub.Id, Guid.NewGuid(), DateTime.UtcNow));
@@ -141,7 +141,7 @@ public sealed class ReviewProcessorTests : IDisposable
         var ctx = FakeConsumeContext.For(new SubmissionCreatedEvent(sub.Id, Guid.NewGuid(), DateTime.UtcNow));
         await _consumer.Consume(ctx);
 
-        _ai.Verify(a => a.ReviewCodeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _ai.Verify(a => a.ReviewCodeAsync(It.IsAny<IReadOnlyList<CodeFileInput>>(), It.IsAny<CancellationToken>()), Times.Never);
         _publisher.Verify(p => p.Publish(It.IsAny<ReviewCompletedEvent>(), It.IsAny<CancellationToken>()), Times.Never);
 
         var updated = await _db.Submissions.FindAsync(sub.Id);
@@ -152,7 +152,7 @@ public sealed class ReviewProcessorTests : IDisposable
     public async Task AiThrows_StatusSetToFailed_ExceptionRethrown()
     {
         var sub = await SeedSubmission();
-        _ai.Setup(a => a.ReviewCodeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _ai.Setup(a => a.ReviewCodeAsync(It.IsAny<IReadOnlyList<CodeFileInput>>(), It.IsAny<CancellationToken>()))
            .ThrowsAsync(new InvalidOperationException("ollama down"));
 
         var ctx = FakeConsumeContext.For(new SubmissionCreatedEvent(sub.Id, Guid.NewGuid(), DateTime.UtcNow));

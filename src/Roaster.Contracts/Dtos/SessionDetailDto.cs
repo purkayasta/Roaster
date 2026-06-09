@@ -9,9 +9,9 @@ public sealed record SessionDetailDto(
     Guid Id,
     string Name,
     DateTime CreatedAt,
-    string? CodeContent,
-    string? Language,
     string? Status,
     long? SubmissionId,
     int TotalComments,
-    int ResolvedComments);
+    int ResolvedComments,
+    bool IsMultiFile,
+    List<PayloadDto> Payloads);

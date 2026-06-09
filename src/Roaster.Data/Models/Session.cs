@@ -11,6 +11,8 @@ public sealed class Session
     public required string Name { get; init; }
     public DateTime CreatedAt { get; init; }
 
+    public bool IsMultiFile { get; init; }
+
     public bool IsActive { get; set; } = true;
 
     public ICollection<Submission> Submissions { get; set; } = [];

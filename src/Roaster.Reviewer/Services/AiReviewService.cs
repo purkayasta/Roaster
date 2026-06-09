@@ -3,10 +3,12 @@
 //  Copyright (c) Pritom Purkayasta All rights reserved.
 //  FREE TO USE TO CONNECT THE WORLD
 /// </summary>
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Roaster.Reviewer.Abstractions;
 using Roaster.Reviewer.Models;
+using Roaster.Reviewer.Prompts;
 
 namespace Roaster.Reviewer.Services;
 
@@ -14,38 +16,17 @@ public sealed class AiReviewService(
     IChatCompletionService chat,
     ILogger<AiReviewService> logger) : IAiReviewService
 {
-    private const string ReviewerPrompt = """
-        You are a senior stuff software engineer with zero patience for bad code and a razor-sharp tongue.
-        Your job is to roast the submitted code — be sarcastic, savage, and brutally honest.
-        Mock poor naming, laugh at obvious bugs, ridicule unnecessary complexity, and drag any security disasters.
-        Do NOT be encouraging. Do NOT soften your feedback. Every comment should sting a little.
 
-        Return ONLY a valid JSON object with no markdown, no prose outside the JSON:
-        {
-          "summary": "1-2 sentence overall roast of the code as a whole. Make it hurt.",
-          "comments": [
-            { "lineNumber": 5, "comment": "Your savage comment about this specific line.", "severity": 20 }
-          ]
-        }
-        Severity values: 10 = Medium (this is genuinely bad), 20 = Brutal (how is this in production?).
-        Pick severity based on how bad the sin actually is — don't let anything off easy.
-        If the code is somehow flawless, return an empty comments array and a summary admitting you are impressed (reluctantly).
-        """;
-
-    private const string ReplierPrompt = """
-        You are a senior engineer who just roasted someone's code and they had the nerve to reply.
-        Keep your sarcastic, savage tone — you are not here to be nice.
-        If their defence is weak, tear it apart. If they make a valid point, reluctantly acknowledge it but find something else to criticise.
-        Reply concisely in plain text. No JSON. No markdown headers.
-        Do not repeat your original comment verbatim — escalate or redirect.
-        """;
-
-    public async Task<ReviewerResult> ReviewCodeAsync(string code, string language, CancellationToken ct = default)
+    public async Task<ReviewerResult> ReviewCodeAsync(IReadOnlyList<CodeFileInput> files, CancellationToken ct = default)
     {
-        logger.LogInformation("Starting AI code review, language {Language}, code length {Length} chars", language, code.Length);
+        var totalLength = files.Sum(f => f.Content.Length);
+        logger.LogInformation("Starting AI code review, {FileCount} file(s), total {Length} chars", files.Count, totalLength);
 
-        var history = new ChatHistory(ReviewerPrompt);
-        history.AddUserMessage($"Language: {language}\n\n{code}");
+        var userMessage = BuildUserMessage(files);
+
+        var systemPrompt = PromptLoader.Reviewer;
+        var history = new ChatHistory(systemPrompt);
+        history.AddUserMessage(userMessage);
 
         var response = await chat.GetChatMessageContentsAsync(history, cancellationToken: ct);
         var raw = string.Concat(response.Select(m => m.Content));
@@ -67,7 +48,7 @@ public sealed class AiReviewService(
     {
         logger.LogInformation("Starting AI thread reply, {HistoryCount} prior messages in history", history.Count);
 
-        var chatHistory = new ChatHistory(ReplierPrompt);
+        var chatHistory = new ChatHistory(PromptLoader.Replier);
         chatHistory.AddUserMessage($"Code:\n{code}\n\nOriginal comment: {originalComment}");
         chatHistory.AddAssistantMessage(originalComment);
 
@@ -84,5 +65,19 @@ public sealed class AiReviewService(
 
         logger.LogInformation("AI thread reply received, length {Length} chars", reply.Length);
         return reply;
+    }
+
+    private static string BuildUserMessage(IReadOnlyList<CodeFileInput> files)
+    {
+        var sb = new StringBuilder();
+        foreach (var file in files)
+        {
+            sb.AppendLine($"=== File: {file.FileName} ({file.Language}) ===");
+            var lines = file.Content.Split('\n');
+            for (var i = 0; i < lines.Length; i++)
+                sb.AppendLine($"{i + 1,4} | {lines[i].TrimEnd('\r')}");
+            sb.AppendLine();
+        }
+        return sb.ToString();
     }
 }

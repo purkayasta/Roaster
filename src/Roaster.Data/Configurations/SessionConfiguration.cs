@@ -17,6 +17,7 @@ public sealed class SessionConfiguration : IEntityTypeConfiguration<Session>
         builder.Property(s => s.Id).HasValueGenerator<GuidV7Generator>();
         builder.Property(s => s.Name).HasMaxLength(255).IsRequired();
         builder.Property(s => s.CreatedAt).IsRequired();
+        builder.Property(s => s.IsMultiFile).HasDefaultValue(false).IsRequired();
         builder.Property(s => s.IsActive).HasDefaultValue(true).IsRequired();
 
         builder.ToTable("Sessions");

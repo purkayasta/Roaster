@@ -9,8 +9,8 @@ public sealed record SessionSubmissionDto(
     long? SubmissionId,
     Guid SessionId,
     string SessionName,
-    string? Language,
     string? Status,
     DateTime SessionCreatedAt,
     int TotalComments,
-    int ResolvedComments);
+    int ResolvedComments,
+    bool IsMultiFile = false);

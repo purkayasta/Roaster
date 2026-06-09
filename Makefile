@@ -1,13 +1,8 @@
-DETACH_FLAG = -d
-ifdef a
-  DETACH_FLAG =
-endif
+infra:
+	docker compose -f docker-compose.infra.yml up --build -d
 
-up:
-	docker-compose up --build $(DETACH_FLAG)
-
-down:
-	docker-compose down
+infra-down:
+	docker compose -f docker-compose.infra.yml down
 
 api:
 	dotnet watch run --project src/Roaster.Api

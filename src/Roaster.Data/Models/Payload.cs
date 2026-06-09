@@ -5,8 +5,9 @@
 /// </summary>
 namespace Roaster.Data.Models;
 
-public sealed record CodePayload
+public sealed record Payload
 {
+    public required string FileName { get; init; }
     public required string Content  { get; init; }
     public required string Language { get; init; }
 }

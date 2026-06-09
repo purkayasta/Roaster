@@ -1,106 +1,4 @@
 window.RoasterReview = {
-    _zoneConfigs: {},
-    _subscribedEditor: null,
-    _scrollDisposable: null,
-    _layoutDisposable: null,
-    _boundOverlayElement: null,
-
-    addZone: function (editorId, lineNumber, domNode) {
-        const editor = window.blazorMonaco.editor.getEditor(editorId, true);
-        if (!editor) return null;
-
-        const spacer = document.createElement('div');
-        const height = domNode.scrollHeight || 120;
-
-        const config = {
-            afterLineNumber: lineNumber,
-            domNode: spacer,
-            heightInPx: height,
-            suppressMouseDown: true
-        };
-
-        let zoneId = null;
-        editor.changeViewZones(accessor => {
-            zoneId = accessor.addZone(config);
-        });
-
-        if (zoneId !== null)
-            this._zoneConfigs[zoneId] = config;
-
-        return zoneId;
-    },
-
-    updateZoneHeight: function (editorId, zoneId, domNode) {
-        const editor = window.blazorMonaco.editor.getEditor(editorId, true);
-        if (!editor || zoneId === null) return;
-
-        const config = this._zoneConfigs[zoneId];
-        if (config) config.heightInPx = domNode.scrollHeight || 120;
-
-        editor.changeViewZones(accessor => {
-            accessor.layoutZone(zoneId);
-        });
-    },
-
-    syncOverlay: function (editorId, overlayId) {
-        const editor = window.blazorMonaco.editor.getEditor(editorId, true);
-        if (!editor) return;
-
-        const self = this;
-        const update = () => {
-            const overlay = document.getElementById(overlayId);
-            if (!overlay) return;
-            const scrollTop = editor.getScrollTop();
-            const contentLeft = editor.getLayoutInfo().contentLeft;
-
-            overlay.querySelectorAll('[data-line]').forEach(el => {
-                const lineNum = parseInt(el.dataset.line);
-                const config = Object.values(self._zoneConfigs).find(c => c.afterLineNumber === lineNum);
-                const zoneHeight = config ? config.heightInPx : (el.scrollHeight || 120);
-                const top = editor.getTopForLineNumber(lineNum + 1) - zoneHeight - scrollTop;
-                el.style.top  = top + 'px';
-                el.style.left = contentLeft + 'px';
-            });
-
-            overlay.style.visibility = 'visible';
-        };
-
-        // Re-subscribe when the editor instance changes (e.g. after SPA navigation).
-        // Dispose old listeners to prevent accumulation on dead editor instances.
-        if (this._subscribedEditor !== editor) {
-            if (this._scrollDisposable) this._scrollDisposable.dispose();
-            if (this._layoutDisposable) this._layoutDisposable.dispose();
-            this._scrollDisposable = editor.onDidScrollChange(update);
-            this._layoutDisposable = editor.onDidLayoutChange(update);
-            this._subscribedEditor = editor;
-        }
-
-        // Track the overlay element reference — if Blazor recreates it, re-bind the wheel listener.
-        const overlay = document.getElementById(overlayId);
-        if (overlay && overlay !== this._boundOverlayElement) {
-            overlay.addEventListener('wheel', (e) => {
-                e.preventDefault();
-                editor.setScrollTop(editor.getScrollTop() + e.deltaY);
-                editor.setScrollLeft(editor.getScrollLeft() + e.deltaX);
-            }, { passive: false });
-            this._boundOverlayElement = overlay;
-        }
-
-        update();
-    },
-
-    removeZones: function (editorId, zoneIds) {
-        const editor = window.blazorMonaco.editor.getEditor(editorId, true);
-        if (!editor || !zoneIds || zoneIds.length === 0) return;
-
-        editor.changeViewZones(accessor => {
-            zoneIds.forEach(id => {
-                accessor.removeZone(id);
-                delete this._zoneConfigs[id];
-            });
-        });
-    },
-
     addDecorations: function (editorId, lineNumbers) {
         const editor = window.blazorMonaco.editor.getEditor(editorId, true);
         if (!editor || !lineNumbers || lineNumbers.length === 0) return [];
@@ -122,5 +20,37 @@ window.RoasterReview = {
         if (!editor || !decorationIds || decorationIds.length === 0) return;
 
         editor.deltaDecorations(decorationIds, []);
+    }
+};
+
+// Drag-to-resize for the comment panel. Adjusts the panel's width directly so
+// dragging stays smooth without round-tripping through Blazor; Monaco's
+// AutomaticLayout ResizeObserver reflows the editor as the panel shrinks/grows.
+window.RoasterSplit = {
+    attach: function (handle, panel, min, max) {
+        if (!handle || !panel || handle.dataset.roasterSplit) return;
+        handle.dataset.roasterSplit = '1';
+
+        let startX = 0;
+        let startW = 0;
+
+        const onMove = e => {
+            const next = Math.max(min, Math.min(max, startW + (startX - e.clientX)));
+            panel.style.width = next + 'px';
+        };
+        const onUp = () => {
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+            document.body.style.userSelect = '';
+        };
+
+        handle.addEventListener('pointerdown', e => {
+            startX = e.clientX;
+            startW = panel.offsetWidth;
+            document.body.style.userSelect = 'none';
+            window.addEventListener('pointermove', onMove);
+            window.addEventListener('pointerup', onUp);
+            e.preventDefault();
+        });
     }
 };

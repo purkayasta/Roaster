@@ -4,7 +4,7 @@
 //  FREE TO USE TO CONNECT THE WORLD
 /// </summary>
 using System.Net.Http.Json;
-using Roaster.Editor.Services.Models;
+using Roaster.Editor.Models;
 
 namespace Roaster.Editor.Services;
 
@@ -22,9 +22,9 @@ public sealed class SessionService(HttpClient client)
         return await ApiResponse<SessionDetailResponse>.FromAsync(response);
     }
 
-    public async Task<ApiResponse<SessionResponse>> CreateAsync(string name, CancellationToken ct = default)
+    public async Task<ApiResponse<SessionResponse>> CreateAsync(string name, bool isMultiFile, CancellationToken ct = default)
     {
-        var response = await client.PostAsJsonAsync("/api/sessions", new { Name = name }, ct);
+        var response = await client.PostAsJsonAsync("/api/sessions", new { Name = name, IsMultiFile = isMultiFile }, ct);
         return await ApiResponse<SessionResponse>.FromAsync(response);
     }
 

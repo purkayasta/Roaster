@@ -41,22 +41,18 @@
         </MudStack>
     </MudPaper>
 
-    <div style="position:relative; flex:1; min-height:0;">
-        <StandaloneCodeEditor @ref="_editor" Id="@CodeUtils.EditorId" ConstructionOptions="BuildOptions" />
+    <div style="display:flex; flex:1; min-height:0;">
+        <div style="flex:1; min-width:0; position:relative;">
+            <StandaloneCodeEditor @ref="_editor" Id="@CodeUtils.EditorId" ConstructionOptions="BuildOptions"
+                                  OnMouseDown="OnEditorMouseDown" />
+        </div>
 
-        @if (_review is not null)
+        @if (SelectedComment is { } selected)
         {
-            <div id="roaster-comment-overlay"
-                 style="position:absolute; top:0; left:0; right:0; bottom:0; pointer-events:none; overflow:hidden; z-index:10; visibility:hidden;">
-                @foreach (var comment in _review.Comments)
-                {
-                    <div @key="comment.LineNumber" @ref="_commentRefs[comment.LineNumber]" data-line="@comment.LineNumber"
-                         style="position:absolute; left:0; right:0; pointer-events:auto;">
-                        <Comment SubmissionId="_submissionId!.Value" ReviewId="_review.Id" CommentData="comment"
-                                 OnZoneResize="() => ResizeZoneAsync(comment.LineNumber)"
-                                 OnResolved="OnCommentResolved" />
-                    </div>
-                }
+            <div @ref="_handleRef" class="roaster-split-handle"></div>
+            <div @ref="_panelRef" class="roaster-comment-panel">
+                <Comment SubmissionId="_submissionId!.Value" ReviewId="_review!.Id" CommentData="selected"
+                         OnClose="ClosePanel" OnResolved="HandleCommentResolvedAsync" @key="selected.LineNumber" />
             </div>
         }
     </div>
@@ -77,15 +73,22 @@
     private ReviewResponse? _review;
     private bool _reviewDirty;
     private bool _polling;
+    private int? _selectedLine;
+    private bool _splitterAttached;
 
-    private readonly Dictionary<int, ElementReference> _commentRefs = new();
-    private readonly Dictionary<int, string> _zoneIds = new();
+    private ElementReference _handleRef;
+    private ElementReference _panelRef;
     private string[] _decorationIds = [];
 
     private CancellationTokenSource? _pollingCts;
 
+    private ReviewCommentResponse? SelectedComment =>
+        _selectedLine is { } line ? _review?.Comments.FirstOrDefault(c => c.LineNumber == line) : null;
+
     protected override async Task OnInitializedAsync()
     {
+        await base.OnInitializedAsync();
+
         if (!string.IsNullOrWhiteSpace(Language))
             _language = Language;
 
@@ -100,41 +103,46 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (_selectedLine is not null && !_splitterAttached)
+        {
+            _splitterAttached = true;
+            await RunLogException(() => CodeUtils.AttachSplitterAsync(JS, _handleRef, _panelRef));
+        }
+
         if (!_reviewDirty || _review is null) return;
         _reviewDirty = false;
 
         await RunLogException(async () =>
         {
-            await ClearZonesAndDecorationsAsync();
+            await ClearDecorationsAsync();
+            if (_review.Comments.Count == 0) return;
 
-            foreach (var comment in _review.Comments)
-            {
-                if (!_commentRefs.TryGetValue(comment.LineNumber, out var domRef)) continue;
-
-                var zoneId = await CodeUtils.AddReviewZoneAsync(JS, comment.LineNumber, domRef);
-                if (zoneId is not null)
-                    _zoneIds[comment.LineNumber] = zoneId;
-            }
-
+            // Draw the clickable gutter dots; clicking one opens the side panel.
             _decorationIds = await CodeUtils.AddReviewDecorationsAsync(JS, _review.Comments);
-            await CodeUtils.SyncOverlayAsync(JS);
         });
     }
 
-    private StandaloneEditorConstructionOptions BuildOptions(StandaloneCodeEditor _) => new()
+    private void OnEditorMouseDown(EditorMouseEvent e)
     {
-        AutomaticLayout = true,
-        Language = _language,
-        Value = string.IsNullOrWhiteSpace(Content) ? CodeUtils.DefaultBoilerplate : Content,
-        Theme = _theme,
-        WordWrap = "on",
-        ScrollBeyondLastLine = false,
-        Minimap = new EditorMinimapOptions { Enabled = false },
-        LineNumbers = "on",
-        FontSize = 14,
-        GlyphMargin = true,
-        FontFamily = "'Geist Mono', 'Cascadia Code', 'Fira Code', monospace",
-    };
+        if (e.Target.Type != MouseTargetType.GUTTER_GLYPH_MARGIN) return;
+        if (e.Target.Position is not { } pos) return;
+        if (_review?.Comments.Any(c => c.LineNumber == pos.LineNumber) != true) return;
+
+        // Toggle: clicking the active line's glyph again closes the panel.
+        _selectedLine = _selectedLine == pos.LineNumber ? null : pos.LineNumber;
+        StateHasChanged();
+    }
+
+    private void ClosePanel()
+    {
+        _selectedLine = null;
+        _splitterAttached = false;
+    }
+
+    private StandaloneEditorConstructionOptions BuildOptions(StandaloneCodeEditor _)
+        => CodeUtils.BuildEditorOptions(_language, _theme, string.IsNullOrWhiteSpace(Content) ? CodeUtils.DefaultBoilerplate : Content);
 
     private async Task OnLanguageChangedAsync(string language) =>
         await CodeUtils.SetLanguageAsync(JS, _editor, language);
@@ -147,7 +155,8 @@
         await RunLogException(async () =>
         {
             var code = await _editor.GetValue();
-            var result = await SubmissionService.SubmitAsync(SessionId, code, _language);
+            var fileName = LanguageExtensionMap.DefaultFileName(_language);
+            var result = await SubmissionService.SubmitAsync(SessionId, [new FileSubmissionRequest(fileName, code, _language)]);
             if (!result.IsSuccess)
             {
                 Snackbar.Add(result.Error ?? $"Request failed ({result.StatusCode}).", Severity.Error);
@@ -156,8 +165,8 @@
 
             _submissionId = result.Data!.Id;
             _review = null;
-            _commentRefs.Clear();
-            await ClearZonesAndDecorationsAsync();
+            ClosePanel();
+            await ClearDecorationsAsync();
             StateHasChanged();
             Snackbar.Add("Submitted for review!", Severity.Success);
             StartPolling(_submissionId.Value);
@@ -218,33 +227,29 @@
 
     private void ApplyReview(ReviewResponse review)
     {
-        _commentRefs.Clear();
-        foreach (var c in review.Comments)
-            _commentRefs[c.LineNumber] = default;
-
         _review = review;
         _reviewDirty = true;
     }
 
-    private async Task ResizeZoneAsync(int lineNumber)
+    private async Task HandleCommentResolvedAsync()
     {
-        if (!_zoneIds.TryGetValue(lineNumber, out var zoneId)) return;
-        if (!_commentRefs.TryGetValue(lineNumber, out var domRef)) return;
+        if (SelectedComment is { } resolved)
+            _review?.Comments.RemoveAll(c => c.LineNumber == resolved.LineNumber);
+
+        ClosePanel();
 
         await RunLogException(async () =>
         {
-            await CodeUtils.UpdateZoneHeightAsync(JS, zoneId, domRef);
-            await CodeUtils.SyncOverlayAsync(JS);
+            await ClearDecorationsAsync();
+            if (_review is { Comments.Count: > 0 })
+                _decorationIds = await CodeUtils.AddReviewDecorationsAsync(JS, _review.Comments);
         });
+
+        await OnCommentResolved.InvokeAsync();
     }
 
-    private async Task ClearZonesAndDecorationsAsync()
+    private async Task ClearDecorationsAsync()
     {
-        if (_zoneIds.Count > 0)
-        {
-            await CodeUtils.RemoveZonesAsync(JS, _zoneIds.Values);
-            _zoneIds.Clear();
-        }
         if (_decorationIds.Length > 0)
         {
             await CodeUtils.ClearDecorationsAsync(JS, _decorationIds);
@@ -256,6 +261,6 @@
     {
         _pollingCts?.Cancel();
         _pollingCts?.Dispose();
-        await ClearZonesAndDecorationsAsync();
+        await ClearDecorationsAsync();
     }
 }

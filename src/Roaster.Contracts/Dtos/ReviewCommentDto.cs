@@ -10,4 +10,5 @@ public record ReviewCommentDto(
     string? Comment,
     string Severity,
     long? ThreadId,
-    bool IsResolved);
+    bool IsResolved,
+    string FileName);

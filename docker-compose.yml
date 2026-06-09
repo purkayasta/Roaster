@@ -8,6 +8,8 @@ services:
       POSTGRES_DB:       roaster
       POSTGRES_USER:     roaster
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -29,6 +31,8 @@ services:
       - "15672:15672"
     networks:
       - roaster-net
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 15s
@@ -59,7 +63,7 @@ services:
         Host=postgres;Database=roaster;Username=roaster;Password=${POSTGRES_PASSWORD:-changeme}
       RabbitMQ__Uri: "rabbitmq://guest:${RABBITMQ_PASSWORD:-guest}@rabbitmq"
       Ollama__Endpoint: "http://host.docker.internal:11434"
-      Ollama__ModelId: ${OLLAMA_MODEL:-qwen2.5-coder:3b}
+      Ollama__ModelId: ${OLLAMA_MODEL:-qwen2.5-coder:3b-instruct-q4_K_M}
     networks:
       - roaster-net
     depends_on:
@@ -115,3 +119,4 @@ networks:
 
 volumes:
   postgres_data:
+  rabbitmq_data:

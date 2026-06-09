@@ -26,7 +26,7 @@ public sealed class ReviewEndpointTests(ApiFactory factory) : IClassFixture<ApiF
         var sub = new Submission
         {
             SessionId = session.Id,
-            Payload   = new CodePayload { Content = "x", Language = "csharp" },
+            Payloads  = [new Payload { FileName = "main.cs", Content = "x", Language = "csharp" }],
             Status    = status,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -76,7 +76,7 @@ public sealed class ReviewEndpointTests(ApiFactory factory) : IClassFixture<ApiF
         {
             SubmissionId = sub.Id,
             Summary = "looks good",
-            Comments = [new ReviewLineComment { LineNumber = 3, Comment = "use const", Severity = ReviewSeverity.Gentle }],
+            Comments = [new ReviewLineComment { FileName = "main.cs", LineNumber = 3, Comment = "use const", Severity = ReviewSeverity.Gentle }],
             CreatedAt = DateTime.UtcNow
         };
         db.Reviews.Add(review);
@@ -103,8 +103,8 @@ public sealed class ReviewEndpointTests(ApiFactory factory) : IClassFixture<ApiF
             SubmissionId = sub.Id,
             Comments =
             [
-                new ReviewLineComment { LineNumber = 1, Comment = "c1", Severity = ReviewSeverity.Gentle },
-                new ReviewLineComment { LineNumber = 2, Comment = "c2", Severity = ReviewSeverity.Brutal }
+                new ReviewLineComment { FileName = "main.cs", LineNumber = 1, Comment = "c1", Severity = ReviewSeverity.Gentle },
+                new ReviewLineComment { FileName = "main.cs", LineNumber = 2, Comment = "c2", Severity = ReviewSeverity.Brutal }
             ],
             CreatedAt = DateTime.UtcNow
         };
@@ -129,7 +129,7 @@ public sealed class ReviewEndpointTests(ApiFactory factory) : IClassFixture<ApiF
         var review = new Review
         {
             SubmissionId = sub.Id,
-            Comments = [new ReviewLineComment { LineNumber = 5, Comment = "x", Severity = ReviewSeverity.Medium }],
+            Comments = [new ReviewLineComment { FileName = "main.cs", LineNumber = 5, Comment = "x", Severity = ReviewSeverity.Medium }],
             CreatedAt = DateTime.UtcNow
         };
         db.Reviews.Add(review);

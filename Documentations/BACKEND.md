@@ -159,7 +159,7 @@ OpenAPI/Scalar UI: `/scalar/v1` (development only).
 
 **AI JSON parsing fallback.** `ReviewResponseParser` runs per agent: direct `JsonSerializer.Deserialize` → markdown code-block extraction → substring search. Returns a `Failed` `ReviewerResult` for that agent on total failure (no exception propagated).
 
-**Multi-agent review (fan-out).** `AiReviewService.ReviewCodeAsync` runs three specialized agents **sequentially** — Security, Bug, Syntax — each an `IReviewAgent`. Today the implementation is `ChatReviewAgent` (one Semantic Kernel chat round-trip per agent, same JSON contract → one shared `ReviewResponseParser`). `IReviewAgent` is the migration seam: moving to Microsoft Agent Framework means adding a `MafReviewAgent` and swapping construction in `ReviewerExtensions` — orchestration, prompts, parser, and the consumer are untouched. Each agent receives all files in one message; a manifest is prepended when >1 file is submitted to prime cross-file reasoning. The service tags each comment with its agent (`[Security] …`), concatenates all comments + summaries into one `ReviewerResult`, and fails only if **all three** agents fail to parse. Overlapping `(file, line)` comments are merged downstream by `CodeReviewService`. Prompts (`Prompts/*.txt`, embedded) all carry a roasting tone; severity 10/20/30 maps to `ReviewSeverity` Gentle/Medium/Brutal.
+**Multi-agent review (fan-out).** `AiReviewService.ReviewCodeAsync` runs three specialized agents **sequentially** — Security, Bug, Syntax — each an `IReviewAgent`. Today the implementation is `ChatReviewAgent` (one Semantic Kernel chat round-trip per agent, same JSON contract → one shared `ReviewResponseParser`). `IReviewAgent` is the migration seam: moving to Microsoft Agent Framework means adding a `MafReviewAgent` and swapping construction in `ReviewerExtensions` — orchestration, prompts, parser, and the consumer are untouched. Each agent receives all files in one message; a manifest is prepended when >1 file is submitted to prime cross-file reasoning. The service tags each comment with its agent (`[Security] …`), concatenates all comments + summaries into one `ReviewerResult`, and fails only if **all three** agents fail to parse. Overlapping `(file, line)` comments are merged downstream by `CodeReviewService`. Prompts (`Prompts/*.txt`, embedded) all carry a roasting tone; severity 10/20/30 maps to `ReviewSeverity` Gentle/Medium/Brutal. Sampling settings live as provider-neutral values on `OllamaOptions` (`Temperature` default `0.3`, `MaxOutputTokens` default unset) and are materialised into `OllamaPromptExecutionSettings` only in `ReviewerExtensions` — the DI seam that changes on the SK→MAF swap (the same values map to MEAI `ChatOptions`). Context window (`num_ctx`) is not settable via the SK connector; set `OLLAMA_CONTEXT_LENGTH` on the Ollama host (see RUNNING.md).
 
 ---
 
@@ -179,7 +179,7 @@ OpenAPI/Scalar UI: `/scalar/v1` (development only).
 {
   "ConnectionStrings": { "Postgres": "..." },
   "RabbitMQ": { "Uri": "..." },
-  "Ollama": { "Endpoint": "http://localhost:11434", "ModelId": "qwen2.5-coder:3b" }
+  "Ollama": { "Endpoint": "http://localhost:11434", "ModelId": "qwen2.5-coder:3b", "Temperature": 0.3, "MaxOutputTokens": null }
 }
 ```
 

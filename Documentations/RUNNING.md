@@ -31,9 +31,19 @@ docker-compose up --build
 docker run -d --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:17-alpine
 docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:4-management-alpine
 # Ollama (needed by Consumer)
-ollama serve   # or run as a service; default port 11434
+OLLAMA_CONTEXT_LENGTH=8192 ollama serve   # or run as a service; default port 11434
 ollama pull qwen2.5-coder:3b
 ```
+
+> **Context window.** Ollama defaults to a 4096-token context (`num_ctx`), shared by the
+> prompt + all submitted code + the response. The multi-agent reviewer sends every file to
+> each agent, so on multi-file submissions the default silently truncates the oldest input
+> (your code/instructions) instead of erroring. Set `OLLAMA_CONTEXT_LENGTH=8192` on the
+> Ollama host to give reviews headroom. (This is a server-level knob — the SK Ollama
+> connector cannot set `num_ctx` per request. A Modelfile `PARAMETER num_ctx` overrides it.)
+>
+> Reviewer sampling (temperature, max output tokens) is set in code via `Ollama:Temperature`
+> / `Ollama:MaxOutputTokens` — see BACKEND.md.
 
 ### 2. Database Migrations
 

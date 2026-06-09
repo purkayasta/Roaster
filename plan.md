@@ -32,3 +32,62 @@ For all implementation details, see [Documentations/Summary.md](Documentations/S
 | 7 | Docker | ✅ Done | [Phase-7-Docker.md](Documentations/Plans/Phase-7-Docker.md) |
 | 8 | Frontend | ✅ Done | [Phase-8-Frontend.md](Documentations/Plans/Phase-8-Frontend.md) |
 | 9 | Continue | ⬜ Not started | [Phase-9-Continue.md](Documentations/Plans/Phase-9-Continue.md) |
+
+---
+
+## Multi-Agent Reviewer Track
+
+Evolving the AI reviewer from a single Semantic Kernel chat call into a specialized
+multi-agent workflow, structured so a later move from Semantic Kernel (SK) to the
+Microsoft Agent Framework (MAF) is a one-file swap. All work is isolated to
+`Roaster.Reviewer` (+ its test project). Staying on SK for now — LangGraph was
+ruled out (Python sidecar in an all-.NET stack).
+
+| # | Phase | Status | Summary |
+|---|-------|--------|---------|
+| MA-1 | Sequential fan-out | ✅ Done | Three specialized agents (Security, Bug, Syntax) run sequentially |
+| MA-2 | Harden model path | ✅ Done | Execution settings (temperature, max output tokens) + context-window guidance |
+| MA-3 | MAF bridge | ⬜ Not started | Back `IReviewAgent` with MAF/MEAI; structured output |
+| MA-4 | Roadmap (model-gated) | ⬜ Not started | Filters, function-calling/plugins, RAG, OpenTelemetry |
+
+### MA-1 — Sequential fan-out ✅ Done
+
+- [x] Add `IReviewAgent` seam (`Name` + `ReviewAsync`) — the SK→MAF migration boundary
+- [x] Add `ChatReviewAgent` (SK chat-backed implementation)
+- [x] Add `security.txt`, `bug.txt`, `syntax.txt` prompts (same JSON contract → reuse parser/models)
+- [x] Roasting tone baked into all prompts; remove unused `reviewer.txt` / `roaster.txt`
+- [x] Enrich prompts: input-format guidance + cross-file awareness; manifest prepended for multi-file submissions
+- [x] `ReviewCodeAsync` runs agents sequentially, tags comments (`[Security] …`), merges into one `ReviewerResult`
+- [x] Failure tolerance: fail only if **all three** agents fail to parse
+- [x] DI wiring in `ReviewerExtensions`; `AddAiReviewer()` signature unchanged (no API/consumer changes)
+- [x] `ReplyToThreadAsync` left untouched; reply test constructor updated
+- [x] Docs updated (CLAUDE.md, BACKEND.md, README.md); full suite green
+
+### MA-2 — Harden model path ✅ Done
+
+Verified against `1.74.0-alpha`: `OllamaPromptExecutionSettings` exposes only
+`Temperature`, `TopP`, `TopK`, `NumPredict`, `Stop`. **No** `Seed`, `NumCtx`, or
+`Format` — so structured output is deferred to MA-3 (needs `IChatClient`).
+
+- [x] `OllamaOptions`: add `Temperature` (default `0.3`) and nullable `MaxOutputTokens` (MEAI naming; default unset). Values held as provider-neutral primitives so they carry over to MEAI `ChatOptions`
+- [x] `ChatReviewAgent`: accept `PromptExecutionSettings?` (base type), pass to `GetChatMessageContentsAsync`
+- [x] `ReviewerExtensions`: build `OllamaPromptExecutionSettings` (`Temperature`, `NumPredict`) from options at the DI seam, inject into the agents
+- [x] Document `Ollama:Temperature` / `MaxOutputTokens` in appsettings + BACKEND.md
+- [x] Reply path unchanged (avoids reply-test churn); all 41 tests green
+- [x] Document `OLLAMA_CONTEXT_LENGTH=8192` on the Ollama host in RUNNING.md (default 4096; SK can't set `num_ctx`)
+- Note: `Seed` / `NumCtx` are Ollama server/model level, not reviewer code; Ollama runs on the host here (not in compose)
+
+### MA-3 — MAF bridge ⬜ Not started
+
+- [ ] Add `MafReviewAgent : IReviewAgent` over MAF/MEAI `IChatClient`; swap construction in `ReviewerExtensions`
+- [ ] Adopt structured output via `IChatClient` `ResponseFormat` / JSON schema (retire regex-fallback path)
+- [ ] Orchestration, prompts, parser, consumer remain untouched
+
+### MA-4 — Roadmap (model-gated) ⬜ Not started
+
+- [ ] Filters (`IFunctionInvocationFilter` / `IPromptRenderFilter`) for cross-cutting logging/metrics
+- [ ] Function-calling / plugins (Roslyn analyzer, CWE lookup) — **gated on a larger model**; 3B unreliable at tool-calling
+- [ ] RAG over team coding standards (vector store + embedding model)
+- [ ] OpenTelemetry on model calls to enrich `ReviewMetrics`
+
+Compression.

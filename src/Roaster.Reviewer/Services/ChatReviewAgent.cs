@@ -4,6 +4,7 @@
 //  FREE TO USE TO CONNECT THE WORLD
 /// </summary>
 using Microsoft.Extensions.Logging;
+using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Roaster.Reviewer.Abstractions;
 using Roaster.Reviewer.Models;
@@ -17,6 +18,7 @@ internal sealed class ChatReviewAgent(
     string name,
     string systemPrompt,
     IChatCompletionService chat,
+    PromptExecutionSettings? settings,
     ILogger logger) : IReviewAgent
 {
     public string Name => name;
@@ -26,7 +28,7 @@ internal sealed class ChatReviewAgent(
         var history = new ChatHistory(systemPrompt);
         history.AddUserMessage(userMessage);
 
-        var response = await chat.GetChatMessageContentsAsync(history, cancellationToken: ct);
+        var response = await chat.GetChatMessageContentsAsync(history, settings, cancellationToken: ct);
         var raw = string.Concat(response.Select(m => m.Content));
 
         logger.LogInformation("Agent {Agent} response received, raw length {Length} chars", name, raw.Length);

@@ -9,4 +9,10 @@ public sealed class OllamaOptions
 {
     public required string Endpoint { get; init; }  // e.g. "http://ollama:11434"
     public required string ModelId  { get; init; }  // e.g. "deepseek-coder:6.7b"
+
+    // Provider-neutral sampling settings (MEAI naming) so they carry over unchanged
+    // on the SK→MAF swap. Materialised into the connector-specific settings type in
+    // ReviewerExtensions — the one place that changes during migration.
+    public double Temperature      { get; init; } = 0.3;   // low: deterministic findings, a little room for the roast
+    public int?   MaxOutputTokens  { get; init; }          // null = uncapped (avoids truncating the JSON response)
 }

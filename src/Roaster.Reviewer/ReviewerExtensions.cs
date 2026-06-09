@@ -25,11 +25,19 @@ public static class ReviewerExtensions
             var chat = new OllamaChatCompletionService(opts.ModelId, new Uri(opts.Endpoint), loggerFactory);
             var agentLogger = loggerFactory.CreateLogger<ChatReviewAgent>();
 
+            // Provider-neutral OllamaOptions → connector-specific settings. On the
+            // SK→MAF swap, this becomes a ChatOptions built from the same options.
+            var settings = new OllamaPromptExecutionSettings
+            {
+                Temperature = (float)opts.Temperature,
+                NumPredict  = opts.MaxOutputTokens,
+            };
+
             IReadOnlyList<IReviewAgent> agents =
             [
-                new ChatReviewAgent("Security", PromptLoader.Security, chat, agentLogger),
-                new ChatReviewAgent("Bug", PromptLoader.Bug, chat, agentLogger),
-                new ChatReviewAgent("Syntax", PromptLoader.Syntax, chat, agentLogger),
+                new ChatReviewAgent("Security", PromptLoader.Security, chat, settings, agentLogger),
+                new ChatReviewAgent("Bug", PromptLoader.Bug, chat, settings, agentLogger),
+                new ChatReviewAgent("Syntax", PromptLoader.Syntax, chat, settings, agentLogger),
             ];
 
             return new AiReviewService(agents, chat, loggerFactory.CreateLogger<AiReviewService>());

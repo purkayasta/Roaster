@@ -50,7 +50,7 @@ public sealed class SubmissionEndpointTests(ApiFactory factory) : IClassFixture<
         var session = await sessionResp.Content.ReadFromJsonAsync<SessionDto>();
 
         var resp = await Client.PostAsJsonAsync("/api/submissions",
-            new { sessionId = session!.Id, files = new[] { new { content = "var x = 1;", language = "csharp" } } });
+            new { sessionId = session!.Id, files = new[] { new { fileName = "main.cs", content = "var x = 1;", language = "csharp" } } });
         resp.StatusCode.Should().Be(HttpStatusCode.Accepted);
     }
 
@@ -64,7 +64,7 @@ public sealed class SubmissionEndpointTests(ApiFactory factory) : IClassFixture<
 
         var codeWithControl = "var x\x01 = 1\x1F;";
         await Client.PostAsJsonAsync("/api/submissions",
-            new { sessionId = session!.Id, files = new[] { new { content = codeWithControl, language = "csharp" } } });
+            new { sessionId = session!.Id, files = new[] { new { fileName = "main.cs", content = codeWithControl, language = "csharp" } } });
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<RoasterDbContext>();
@@ -98,7 +98,7 @@ public sealed class SubmissionEndpointTests(ApiFactory factory) : IClassFixture<
         await db.SaveChangesAsync();
 
         var resp = await Client.PostAsJsonAsync("/api/submissions",
-            new { sessionId = session.Id, files = new[] { new { content = "var y = 2;", language = "csharp" } } });
+            new { sessionId = session.Id, files = new[] { new { fileName = "main.cs", content = "var y = 2;", language = "csharp" } } });
 
         resp.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }

@@ -5,4 +5,4 @@
 /// </summary>
 namespace Roaster.Editor.Models;
 
-public record SessionResponse(Guid Id, string Name, DateTime CreatedAt);
+public record SessionResponse(Guid Id, string Name, DateTime CreatedAt, bool IsMultiFile);

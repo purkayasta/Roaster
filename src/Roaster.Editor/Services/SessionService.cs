@@ -22,9 +22,9 @@ public sealed class SessionService(HttpClient client)
         return await ApiResponse<SessionDetailResponse>.FromAsync(response);
     }
 
-    public async Task<ApiResponse<SessionResponse>> CreateAsync(string name, CancellationToken ct = default)
+    public async Task<ApiResponse<SessionResponse>> CreateAsync(string name, bool isMultiFile, CancellationToken ct = default)
     {
-        var response = await client.PostAsJsonAsync("/api/sessions", new { Name = name }, ct);
+        var response = await client.PostAsJsonAsync("/api/sessions", new { Name = name, IsMultiFile = isMultiFile }, ct);
         return await ApiResponse<SessionResponse>.FromAsync(response);
     }
 

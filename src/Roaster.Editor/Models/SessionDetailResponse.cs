@@ -13,6 +13,7 @@ public record SessionDetailResponse(
     long? SubmissionId,
     int TotalComments,
     int ResolvedComments,
+    bool IsMultiFile,
     List<PayloadResponse> Payloads);
 
 public record PayloadResponse(string? FileName, string? Content, string? Language);

@@ -13,4 +13,5 @@ public sealed record SessionDetailDto(
     long? SubmissionId,
     int TotalComments,
     int ResolvedComments,
+    bool IsMultiFile,
     List<PayloadDto> Payloads);

@@ -50,7 +50,7 @@
         {
             await RunLogException(async () =>
             {
-                var response = await SessionService.CreateAsync(newSession.Name);
+                var response = await SessionService.CreateAsync(newSession.Name, newSession.IsMulti);
                 if (response.IsSuccess)
                 {
                     var url = newSession.IsMulti

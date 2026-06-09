@@ -80,7 +80,7 @@
             if (result.IsSuccess)
             {
                 _session = result.Data;
-                _isMultiFile = _session!.Payloads.Any(p => p.FileName != null)
+                _isMultiFile = _session!.IsMultiFile
                                || string.Equals(Mode, "multi", StringComparison.OrdinalIgnoreCase);
             }
             else

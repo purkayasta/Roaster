@@ -10,11 +10,11 @@ public sealed class SessionService(RoasterDbContext db, ILogger<SessionService> 
 {
     public async Task<ServiceResult<SessionDto>> CreateAsync(CreateSessionRequest req, CancellationToken ct)
     {
-        var session = new Session { Name = req.Name, CreatedAt = DateTime.UtcNow };
+        var session = new Session { Name = req.Name, IsMultiFile = req.IsMultiFile, CreatedAt = DateTime.UtcNow };
         db.Sessions.Add(session);
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Session {Id} created", session.Id);
-        return ServiceResult<SessionDto>.Ok(new SessionDto(session.Id, session.Name, session.CreatedAt));
+        return ServiceResult<SessionDto>.Ok(new SessionDto(session.Id, session.Name, session.CreatedAt, session.IsMultiFile));
     }
 
     public async Task<ServiceResult<List<SessionSubmissionDto>>> GetAllAsync(int page, int pageSize, CancellationToken ct)
@@ -37,8 +37,7 @@ public sealed class SessionService(RoasterDbContext db, ILogger<SessionService> 
             var latest = s.Submissions.MaxBy(sub => sub.Id);
             var total = latest?.Review?.Comments.Count ?? 0;
             var resolved = latest?.Review?.Threads.Count(t => t.Status == ThreadStatus.Resolved) ?? 0;
-            var isMulti = latest?.Payloads.Any(p => p.FileName != null) ?? false;
-            return new SessionSubmissionDto(SubmissionId: latest?.Id, SessionId: s.Id, SessionName: s.Name, Status: latest?.Status.ToString(), SessionCreatedAt: s.CreatedAt, TotalComments: total, ResolvedComments: resolved, IsMultiFile: isMulti);
+            return new SessionSubmissionDto(SubmissionId: latest?.Id, SessionId: s.Id, SessionName: s.Name, Status: latest?.Status.ToString(), SessionCreatedAt: s.CreatedAt, TotalComments: total, ResolvedComments: resolved, IsMultiFile: s.IsMultiFile);
         }).ToList();
 
         logger.LogInformation("Returning {Count} sessions", results.Count);
@@ -68,6 +67,7 @@ public sealed class SessionService(RoasterDbContext db, ILogger<SessionService> 
             latest?.Id,
             total,
             resolved,
+            session.IsMultiFile,
             payloads));
     }
 

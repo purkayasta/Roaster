@@ -147,8 +147,21 @@ samp {
 }
 
 .roaster-severity-chip {
-    height: 20px !important;
-    font-size: 11px !important;
+    height: 22px !important;
+    font-size: 12px !important;
+    font-weight: 600;
+}
+
+.roaster-category-chip {
+    height: 18px !important;
+    font-size: 10px !important;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+}
+
+.roaster-comment-segment + .roaster-comment-segment {
+    margin-top: 8px;
 }
 
 .roaster-comment-text {

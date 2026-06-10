@@ -25,15 +25,27 @@ public sealed class AiReviewService(
             agents.Count, files.Count, totalLength);
 
         var userMessage = BuildUserMessage(files);
+        var languages = files.Select(f => f.Language).ToList();
 
         // Run each specialised agent sequentially and tag its comments with the agent name.
         var comments = new List<AiLineComment>();
         var summaries = new List<string>();
+        var agentResults = new List<AgentReviewResult>();
         var anySucceeded = false;
 
         foreach (var agent in agents)
         {
-            var result = await agent.ReviewAsync(userMessage, ct);
+            // Each agent gets language-specific guidance for its own concern (bug sources,
+            // vulnerabilities, or quality idioms) for the languages in this submission.
+            var guide = LanguageGuide.ForAgent(agent.Name, languages);
+            var message = guide.Length > 0 ? $"{userMessage}\n\n{guide}" : userMessage;
+
+            var result = await agent.ReviewAsync(message, ct);
+
+            // Record every agent's outcome (success or failure) so the Consumer can log
+            // one event per agent with its own summary.
+            agentResults.Add(new AgentReviewResult(agent.Name, result.Status, result.Summary, result.LineComments.Count));
+
             if (result.Status is not ReviewStatus.Success)
             {
                 logger.LogWarning("Agent {Agent} failed to produce a parseable review", agent.Name);
@@ -51,13 +63,13 @@ public sealed class AiReviewService(
         if (!anySucceeded)
         {
             logger.LogError("All {AgentCount} review agents failed to produce a parseable review", agents.Count);
-            return new ReviewerResult(ReviewStatus.Failed, []);
+            return new ReviewerResult(ReviewStatus.Failed, []) { AgentResults = agentResults };
         }
 
         logger.LogInformation("AI review merged: {CommentCount} line comments from {AgentCount} agent(s)",
             comments.Count, agents.Count);
 
-        return new ReviewerResult(ReviewStatus.Success, comments, string.Join("\n", summaries));
+        return new ReviewerResult(ReviewStatus.Success, comments, string.Join("\n", summaries)) { AgentResults = agentResults };
     }
 
     // Prefix the comment with its source agent so the origin survives downstream

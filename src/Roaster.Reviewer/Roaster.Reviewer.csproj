@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Prompts\*.txt" />
+    <EmbeddedResource Include="Prompts\Languages\**\*.txt" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,0 +1,9 @@
+JavaScript — common security issues
+- XSS: innerHTML / outerHTML / document.write / dangerouslySetInnerHTML with untrusted input — build DOM as text, not HTML.
+- Code execution: eval, new Function, or setTimeout/setInterval with a string built from untrusted input.
+- Injection: untrusted input concatenated into SQL, into a shell (child_process.exec), or into a file path (traversal).
+- Prototype pollution: merging/cloning untrusted objects into {} via keys like __proto__/constructor.
+- Hardcoded secrets or API keys in source that ships to the client.
+- Trusting client-supplied data for authorization decisions; missing server-side validation before a sink.
+- Insecure randomness (Math.random) for tokens/ids/passwords; weak or absent crypto.
+- ReDoS: a catastrophic-backtracking regex run against user-controlled input.

@@ -32,7 +32,7 @@ docker run -d --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgre
 docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:4-management-alpine
 # Ollama (needed by Consumer)
 OLLAMA_CONTEXT_LENGTH=8192 ollama serve   # or run as a service; default port 11434
-ollama pull qwen2.5-coder:3b
+ollama pull qwen2.5-coder:7b
 ```
 
 > **Context window.** Ollama defaults to a 4096-token context (`num_ctx`), shared by the

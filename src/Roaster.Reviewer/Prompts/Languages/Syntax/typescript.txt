@@ -1,0 +1,8 @@
+TypeScript — quality checks
+- Flag any — prefer a precise type, a union, unknown, or a generic. Avoid non-null assertions (!) that paper over a genuinely possibly-undefined value.
+- Use const by default, let when reassigned; flag var. Use === / !== over == / !=.
+- Let inference handle obvious locals; annotate function parameters and public return types.
+- Prefer interfaces/type aliases for repeated object shapes — name a shared shape once instead of re-typing it. Use readonly and as const for data that should not change.
+- Prefer discriminated unions with an exhaustive switch (never check in the default) over loose string flags; use string-literal unions or enums consistently for fixed sets.
+- Prefer async/await over .then chains; flag missing await and unhandled rejections.
+- Naming: camelCase for variables/functions, PascalCase for types/classes/interfaces.

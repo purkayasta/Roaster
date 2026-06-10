@@ -13,6 +13,6 @@ public sealed class OllamaOptions
     // Provider-neutral sampling settings (MEAI naming) so they carry over unchanged
     // on the SK→MAF swap. Materialised into the connector-specific settings type in
     // ReviewerExtensions — the one place that changes during migration.
-    public double Temperature      { get; init; } = 0.3;   // low: deterministic findings, a little room for the roast
+    public double Temperature      { get; init; } = 0.2;   // low: grounded findings (minimises invented issues), a little room for the roast
     public int?   MaxOutputTokens  { get; init; }          // null = uncapped (avoids truncating the JSON response)
 }

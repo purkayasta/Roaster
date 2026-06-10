@@ -56,7 +56,7 @@ make down           # tear down
 1. `make up` — start full stack in Docker (DB + RabbitMQ + migration + API + consumer + frontend)
 2. Or for local hot-reload: `make api` + `make consumer` + `make editor` (requires Docker infra already running)
 
-All Docker images use alpine variants for minimal size. Ollama model is configured via `OLLAMA_MODEL` env var (default: `qwen2.5-coder:3b`).
+All Docker images use alpine variants for minimal size. Ollama model is configured via `OLLAMA_MODEL` env var (default: `qwen2.5-coder:7b`).
 
 ---
 
@@ -68,7 +68,7 @@ All Docker images use alpine variants for minimal size. Ollama model is configur
 
 **Multi-agent review.** `AiReviewService.ReviewCodeAsync` runs three specialized agents **sequentially** — Security, Bug, Syntax — each behind the `IReviewAgent` seam (today `ChatReviewAgent` over Semantic Kernel; the seam keeps a future move to Microsoft Agent Framework a one-file swap). Every agent gets all files in one message; when >1 file is submitted, a manifest primes cross-file reasoning. Comments are tagged with their agent (`[Security] …`), concatenated into one `ReviewerResult`, and de-duped downstream by `CodeReviewService`'s group-by `(file, line)`. A review fails only if **all three** agents fail to parse. All prompts carry a roasting tone (embedded `Prompts/*.txt`).
 
-**Key tech:** ASP.NET Core 10 (Minimal APIs) · EF Core 10 + Npgsql (Postgres 17-alpine) · MassTransit 8 + RabbitMQ · Semantic Kernel 1.74.0 + Ollama (`qwen2.5-coder:3b`) · Blazor WASM 10 · MudBlazor 9.4 · BlazorMonaco 3.4 · DbUp 7.
+**Key tech:** ASP.NET Core 10 (Minimal APIs) · EF Core 10 + Npgsql (Postgres 17-alpine) · MassTransit 8 + RabbitMQ · Semantic Kernel 1.74.0 + Ollama (`qwen2.5-coder:7b`) · Blazor WASM 10 · MudBlazor 9.4 · BlazorMonaco 3.4 · DbUp 7.
 
 **JSONB columns:** `Submission.Payload` (code + language), `Review.Comments` (line comments array), `Event.Metadata`.
 

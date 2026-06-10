@@ -1,0 +1,10 @@
+C# — quality checks
+- Naming: PascalCase for types/methods/properties, camelCase for locals/parameters, _camelCase for private fields. Interfaces start with I. Async methods end with Async.
+- Prefer pattern matching and switch expressions over long if/else or switch-statement ladders where they read clearer.
+- Use var when the type is obvious from the right-hand side; spell the type out when it aids readability.
+- Prefer LINQ for simple transforms/filters, but not when it hides an expensive or side-effecting operation inside a query.
+- Dispose IDisposable with using (prefer using declarations). Flag manual try/finally that a using would replace.
+- Prefer records for immutable data, sealed classes by default, readonly fields where state never changes.
+- With nullable reference types on: flag missing null handling where the type is nullable, and redundant null checks where it is already provably non-null.
+- Use string interpolation over concatenation; use StringBuilder when building strings in a loop.
+- Flag async void (outside event handlers), blocking on async with .Result/.Wait(), and missing ConfigureAwait only where it actually matters.

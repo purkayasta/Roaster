@@ -1,0 +1,9 @@
+C# — common security issues
+- SQL injection: string-concatenated SQL, or FromSqlRaw/ExecuteSqlRaw with interpolation — use parameters or FromSqlInterpolated.
+- Command/path injection: Process.Start with untrusted args; Path.Combine with attacker-controlled segments enabling ../ traversal.
+- Unsafe deserialization: BinaryFormatter (banned), JSON TypeNameHandling.Auto/All, XML with an open XmlResolver (XXE).
+- Weak crypto: MD5/SHA1 for passwords (use PBKDF2/bcrypt/Argon2), ECB mode, static or zero IV, hardcoded keys.
+- Hardcoded secrets: connection strings, API keys, passwords in source or committed config.
+- Missing authorization: endpoints without an auth check; trusting a client-supplied id without verifying ownership.
+- Sensitive data leaked in logs or in exception detail returned to the caller.
+- SSRF via HttpClient to an untrusted URL; open redirect from an unvalidated returnUrl.

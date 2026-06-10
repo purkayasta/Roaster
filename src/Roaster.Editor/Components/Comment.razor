@@ -7,6 +7,7 @@
               Style="padding:4px 6px;">
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
             <MudChip T="string" Size="Size.Small" Color="CodeUtils.GetSeverityColor(CommentData.Severity)"
+                     Icon="@CodeUtils.GetSeverityIcon(CommentData.Severity)"
                      Variant="Variant.Filled" Class="roaster-severity-chip">
                 @CommentData.Severity
             </MudChip>
@@ -34,7 +35,19 @@
 
     <MudDivider />
     <div style="padding:6px 8px;">
-            <MudText Typo="Typo.body2" Class="roaster-comment-text">@CommentData.Comment</MudText>
+            @foreach (var segment in CodeUtils.SplitTaggedComment(CommentData.Comment))
+            {
+                <div class="roaster-comment-segment">
+                    @if (segment.Category is { } category)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="CodeUtils.GetCategoryColor(category)"
+                                 Variant="Variant.Filled" Class="roaster-category-chip">
+                            @category
+                        </MudChip>
+                    }
+                    <MudText Typo="Typo.body2" Class="roaster-comment-text">@segment.Text</MudText>
+                </div>
+            }
 
             @if (_replies.Count > 0)
             {

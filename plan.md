@@ -1,6 +1,6 @@
 # Roaster — Plan
 
-For all implementation details, see [Documentations/Summary.md](Documentations/Summary.md).
+For current-state reference, see [BACKEND.md](Documentations/BACKEND.md) and [FRONTEND.md](Documentations/FRONTEND.md). Completed build specs are archived in [Documentations/Plans/Archive/](Documentations/Plans/Archive/).
 
 ---
 
@@ -22,16 +22,16 @@ For all implementation details, see [Documentations/Summary.md](Documentations/S
 
 | # | Phase | Status | Detail |
 |---|-------|--------|--------|
-| 0 | Setup & Rename | ✅ Done | [Phase-0-Setup.md](Documentations/Plans/Phase-0-Setup.md) |
-| 1 | API | ✅ Done | [Phase-1-API.md](Documentations/Plans/Phase-1-API.md) |
-| 2 | Events | ✅ Done | [Phase-2-Events.md](Documentations/Plans/Phase-2-Events.md) |
-| 3 | Correlation IDs | ✅ Done | [Phase-3-CorrelationIDs.md](Documentations/Plans/Phase-3-CorrelationIDs.md) |
-| 4 | AI Reviewer | ✅ Done | [Phase-4-AIReviewer.md](Documentations/Plans/Phase-4-AIReviewer.md) |
-| 5 | Unit Tests | ✅ Done | [Phase-5-UnitTests.md](Documentations/Plans/Phase-5-UnitTests.md) |
-| 6 | DbUp Migrations | ⬜ Not started | [Phase-6-Migration.md](Documentations/Plans/Phase-6-Migration.md) |
-| 7 | Docker | ✅ Done | [Phase-7-Docker.md](Documentations/Plans/Phase-7-Docker.md) |
-| 8 | Frontend | ✅ Done | [Phase-8-Frontend.md](Documentations/Plans/Phase-8-Frontend.md) |
-| 9 | Continue | ⬜ Not started | [Phase-9-Continue.md](Documentations/Plans/Phase-9-Continue.md) |
+| 0 | Setup & Rename | ✅ Done | [Phase-0-Setup.md](Documentations/Plans/Archive/Phase-0-Setup.md) |
+| 1 | API | ✅ Done | [Phase-1-API.md](Documentations/Plans/Archive/Phase-1-API.md) |
+| 2 | Events | ✅ Done | [Phase-2-Events.md](Documentations/Plans/Archive/Phase-2-Events.md) |
+| 3 | Correlation IDs | ✅ Done | [Phase-3-CorrelationIDs.md](Documentations/Plans/Archive/Phase-3-CorrelationIDs.md) |
+| 4 | AI Reviewer | ✅ Done | [Phase-4-AIReviewer.md](Documentations/Plans/Archive/Phase-4-AIReviewer.md) |
+| 5 | Unit Tests | ✅ Done | [Phase-5-UnitTests.md](Documentations/Plans/Archive/Phase-5-UnitTests.md) |
+| 6 | DbUp Migrations | ⬜ Not started | [Phase-6-Migration.md](Documentations/Plans/Archive/Phase-6-Migration.md) |
+| 7 | Docker | ✅ Done | [Phase-7-Docker.md](Documentations/Plans/Archive/Phase-7-Docker.md) |
+| 8 | Frontend | ✅ Done | [Phase-8-Frontend.md](Documentations/Plans/Archive/Phase-8-Frontend.md) |
+| 9 | Continue | ⬜ Not started | [Phase-9-Continue.md](Documentations/Plans/Archive/Phase-9-Continue.md) |
 
 ---
 
@@ -95,8 +95,9 @@ Verified against `1.74.0-alpha`: `OllamaPromptExecutionSettings` exposes only
 ## Source-Agnostic / PR Integration Track
 
 Making the system source-agnostic so GitHub and Azure DevOps PR reviews can be added
-as adapters without breaking the web editor. Full plan:
-[Extend-System-Plan.md](Documentations/Plans/Extend-System-Plan.md).
+as adapters without breaking the web editor. Roadmap:
+[Extend-System-Plan.md](Documentations/Plans/Extend-System-Plan.md); detailed adapter
+design (ES-1…ES-4): [Platform-Integration-Plan.md](Documentations/Plans/Platform-Integration-Plan.md).
 
 | # | Phase | Status | Summary |
 |---|-------|--------|---------|

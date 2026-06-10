@@ -4,6 +4,10 @@ Make Roaster **source-agnostic** so GitHub and Azure DevOps PR reviews can be ad
 later as adapters — **without breaking the existing web editor**. The web editor
 becomes the first of several "review sources," not a special case.
 
+> **Detailed adapter design** for ES-1…ES-4 (wrapper = two adapters, in-process vs
+> service decision, per-platform task breakdowns):
+> [Platform-Integration-Plan.md](Platform-Integration-Plan.md).
+
 ---
 
 ## Guiding principle — Ports & Adapters

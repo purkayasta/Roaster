@@ -59,14 +59,14 @@ docker-compose.yml
 
 ## Getting started
 
-See [configure.md](configure.md) for the full step-by-step setup guide.
+See [Documentations/RUNNING.md](Documentations/RUNNING.md) for the full step-by-step setup guide.
 
 The short version:
 
 ```bash
 # 1. Start Ollama natively (runs outside Docker on Mac)
 ollama serve
-ollama pull deepseek-coder:1.3b
+ollama pull qwen2.5-coder:7b
 
 # 2. Build and start everything
 make up

@@ -63,7 +63,7 @@ services:
         Host=postgres;Database=roaster;Username=roaster;Password=${POSTGRES_PASSWORD:-changeme}
       RabbitMQ__Uri: "rabbitmq://guest:${RABBITMQ_PASSWORD:-guest}@rabbitmq"
       Ollama__Endpoint: "http://host.docker.internal:11434"
-      Ollama__ModelId: ${OLLAMA_MODEL:-qwen2.5-coder:3b-instruct-q4_K_M}
+      Ollama__ModelId: ${OLLAMA_MODEL:-qwen2.5-coder:7b-instruct-q4_K_M}
     networks:
       - roaster-net
     depends_on:

@@ -1,0 +1,9 @@
+JavaScript — common bug sources
+- == coercion surprises (0 == "", null == undefined); NaN !== NaN; falsy traps (0, "", null all falsy in conditionals).
+- this binding lost in callbacks; arrow vs function context.
+- Async: forgotten await, unhandled promise rejection, await inside forEach (does NOT wait) — use for...of or Promise.all.
+- Mutating arrays/objects passed by reference, including shared module-level state.
+- Floating point (0.1 + 0.2 !== 0.3); parseInt without a radix.
+- Off-by-one and array holes; using map purely for side effects; changing array length mid-iteration.
+- Closures capturing a var loop variable (use let/const).
+- Reading properties off undefined/null without optional chaining or a default.

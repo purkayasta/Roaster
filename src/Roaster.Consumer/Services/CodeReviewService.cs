@@ -147,6 +147,26 @@ public sealed class CodeReviewService(
                 CreatedAt = DateTime.UtcNow
             });
 
+            // One event per agent, carrying that agent's own summary in the metadata.
+            foreach (var agentResult in aiResult.AgentResults)
+            {
+                db.Events.Add(new Event
+                {
+                    SubmissionId = submission.Id,
+                    SessionId = submission.SessionId,
+                    EventType = EventType.AgentCompleted,
+                    CorrelationId = msg.CorrelationId,
+                    Metadata = JsonSerializer.Serialize(new
+                    {
+                        agent = agentResult.AgentName,
+                        status = agentResult.Status.ToString(),
+                        summary = agentResult.Summary,
+                        commentCount = agentResult.CommentCount
+                    }),
+                    OccurredAt = DateTime.UtcNow
+                });
+            }
+
             db.Events.Add(new Event
             {
                 SubmissionId = submission.Id,
@@ -185,15 +205,15 @@ public sealed class CodeReviewService(
 
     // Resolve the AI-reported file name to one of the submitted files so every
     // comment maps to a real tab. Falls back to the first file when nothing matches.
-    private string ResolveFileName(string? aiName, IReadOnlyList<CodeFileInput> files)
+    private string ResolveFileName(string? aiName, List<CodeFileInput> files)
     {
         if (!string.IsNullOrWhiteSpace(aiName))
         {
-            var match = files.FirstOrDefault(f => f.FileName.Equals(aiName, StringComparison.OrdinalIgnoreCase))
-                     ?? files.FirstOrDefault(f => Path.GetFileName(f.FileName).Equals(Path.GetFileName(aiName), StringComparison.OrdinalIgnoreCase));
-            if (match is not null) return match.FileName;
+            var match = files.FirstOrDefault(f => string.Equals(f.FileName, aiName, StringComparison.OrdinalIgnoreCase))
+                     ?? files.FirstOrDefault(f => string.Equals(Path.GetFileName(f.FileName), Path.GetFileName(aiName), StringComparison.OrdinalIgnoreCase));
+            if (match is not null) return match.FileName ?? aiName;
             logger.LogWarning("AI comment references unknown file {File}; defaulting to {Default}", aiName, files[0].FileName);
         }
-        return files[0].FileName;
+        return files[0].FileName ?? string.Empty;
     }
 }

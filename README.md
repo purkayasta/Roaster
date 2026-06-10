@@ -36,7 +36,7 @@ Roaster is an AI-powered code review tool that gives you brutally honest, inline
 src/
   Roaster.Api          — HTTP endpoints, validation, event publishing
   Roaster.Consumer     — RabbitMQ consumer, orchestrates AI review flow
-  Roaster.Reviewer     — Semantic Kernel + Ollama integration
+  Roaster.Reviewer     — Multi-agent reviewer (Security/Bug/Syntax) on Semantic Kernel + Ollama
   Roaster.Data         — EF Core DbContext and entity configs
   Roaster.Contracts    — Shared events and DTOs
   Roaster.Migration    — DbUp console app, runs SQL scripts on startup
@@ -59,14 +59,14 @@ docker-compose.yml
 
 ## Getting started
 
-See [configure.md](configure.md) for the full step-by-step setup guide.
+See [Documentations/RUNNING.md](Documentations/RUNNING.md) for the full step-by-step setup guide.
 
 The short version:
 
 ```bash
 # 1. Start Ollama natively (runs outside Docker on Mac)
 ollama serve
-ollama pull deepseek-coder:1.3b
+ollama pull qwen2.5-coder:7b
 
 # 2. Build and start everything
 make up

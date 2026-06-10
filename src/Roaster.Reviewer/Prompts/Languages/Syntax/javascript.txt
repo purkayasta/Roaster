@@ -1,0 +1,9 @@
+JavaScript — quality checks
+- Use const by default, let when reassigned; flag every var.
+- Use === / !== over == / != to avoid coercion surprises.
+- Prefer array methods (map/filter/reduce/some/every) over manual index loops for simple transforms; prefer arrow functions for callbacks.
+- Prefer async/await over raw .then chains; flag missing await and unhandled promise rejections.
+- Use template literals instead of string concatenation.
+- Prefer destructuring and spread over manual property access/copying where it reads clearer.
+- Flag mutation of function arguments and shared module-level mutable state.
+- Naming: camelCase for variables/functions, PascalCase for classes/constructors, UPPER_SNAKE_CASE for true constants.

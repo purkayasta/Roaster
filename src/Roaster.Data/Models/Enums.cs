@@ -33,5 +33,6 @@ public enum EventType
     ReviewCompleted   = 30,
     Failed            = 40,
     UserReplied       = 50,
-    AiReplied         = 60
+    AiReplied         = 60,
+    AgentCompleted    = 70
 }

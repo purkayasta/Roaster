@@ -1,0 +1,7 @@
+TypeScript — common bug sources
+- any disabling type checks so a real type error slips through; unsafe as casts and non-null assertions (!) on values that are actually undefined at runtime.
+- All JavaScript bug sources still apply: == coercion, lost this, forgotten await, await inside forEach, reference mutation.
+- Non-exhaustive switch over a union/enum with no never check silently drops a case when a new variant is added.
+- Runtime data (JSON/API responses) not matching the declared type — the compiler trusts the annotation, not reality.
+- Optional vs undefined confusion; using a value before narrowing it.
+- Object typed readonly but aliased through a mutable reference and changed.

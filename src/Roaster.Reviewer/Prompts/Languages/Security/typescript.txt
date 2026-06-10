@@ -1,0 +1,6 @@
+TypeScript — common security issues
+- Types are compile-time only: a declared type does NOT validate untrusted runtime data — validate JSON/API/user input with a schema or guard before trusting it.
+- All JavaScript issues apply: XSS via innerHTML/dangerouslySetInnerHTML, eval/new Function on untrusted input, injection into SQL/shell/paths, prototype pollution.
+- any and as casts on external data bypass the one check that might have caught a malformed or malicious shape.
+- Hardcoded secrets or API keys in source that ships to the client.
+- Insecure randomness (Math.random) for tokens; weak or absent crypto.

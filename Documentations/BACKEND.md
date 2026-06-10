@@ -6,7 +6,7 @@
 |---|---|---|
 | **Roaster.Api** | Web | HTTP endpoints, service layer, validation, middleware, publishes events |
 | **Roaster.Consumer** | Worker | Consumes RabbitMQ messages, orchestrates review flow |
-| **Roaster.Reviewer** | Class Library | `IAiReviewService` — Semantic Kernel 1.74.0 + Ollama connector (alpha) |
+| **Roaster.Reviewer** | Class Library | `IAiReviewService` — three sequential `IReviewAgent`s (Security, Bug, Syntax) on Semantic Kernel 1.74.0 + Ollama connector (alpha) |
 | **Roaster.Data** | Class Library | EF Core `RoasterDbContext`, entity configs, no migrations |
 | **Roaster.Contracts** | Class Library | Shared events and DTOs; no external dependencies |
 | **Roaster.Migration** | Console App | DbUp 7.0.1; runs `Scripts/Tables/*.sql` then `Scripts/Indexes/*.sql` |
@@ -54,7 +54,7 @@ GET /api/submissions/{id}
 RabbitMQ: code-submitted queue (PrefetchCount=1, ConcurrentMessageLimit=1)
   → CodeSubmittedConsumer
   → Status: Submitted → Processing; logs Event(ProcessingStarted)
-  → Calls IAiReviewService.ReviewCodeAsync()
+  → Calls IAiReviewService.ReviewCodeAsync() — fans out to 3 sequential agents (Security, Bug, Syntax), tags + merges their comments
   → Saves Review (Summary + Comments JSONB) + ReviewMetrics + Event(ReviewCompleted)
   → Status: Processing → Completed
   → Publishes ReviewCompletedEvent
@@ -157,7 +157,9 @@ OpenAPI/Scalar UI: `/scalar/v1` (development only).
 - `UserThreadReplyConsumer`: fixed intervals [3 s, 10 s, 30 s].
 - Consumers explicitly rethrow on AI failure so MassTransit retries fire.
 
-**AI JSON parsing fallback.** `ReviewResponseParser` tries: direct `JsonSerializer.Deserialize` → markdown code-block extraction → substring search. Returns an empty `AiReviewResult` on total failure (no exception propagated).
+**AI JSON parsing fallback.** `ReviewResponseParser` runs per agent: direct `JsonSerializer.Deserialize` → markdown code-block extraction → substring search. Returns a `Failed` `ReviewerResult` for that agent on total failure (no exception propagated).
+
+**Multi-agent review (fan-out).** `AiReviewService.ReviewCodeAsync` runs three specialized agents **sequentially** — Security, Bug, Syntax — each an `IReviewAgent`. Today the implementation is `ChatReviewAgent` (one Semantic Kernel chat round-trip per agent, same JSON contract → one shared `ReviewResponseParser`). `IReviewAgent` is the migration seam: moving to Microsoft Agent Framework means adding a `MafReviewAgent` and swapping construction in `ReviewerExtensions` — orchestration, prompts, parser, and the consumer are untouched. Each agent receives all files in one message; a manifest is prepended when >1 file is submitted to prime cross-file reasoning. The service tags each comment with its agent (`[Security] …`), concatenates all comments + summaries into one `ReviewerResult`, and fails only if **all three** agents fail to parse. Overlapping `(file, line)` comments are merged downstream by `CodeReviewService`. Prompts (`Prompts/*.txt`, embedded) all carry a roasting tone; severity 10/20/30 maps to `ReviewSeverity` Gentle/Medium/Brutal. Sampling settings live as provider-neutral values on `OllamaOptions` (`Temperature` default `0.2`, `MaxOutputTokens` default unset) and are materialised into `OllamaPromptExecutionSettings` only in `ReviewerExtensions` — the DI seam that changes on the SK→MAF swap (the same values map to MEAI `ChatOptions`). Context window (`num_ctx`) is not settable via the SK connector; set `OLLAMA_CONTEXT_LENGTH` on the Ollama host (see RUNNING.md).
 
 ---
 
@@ -177,7 +179,7 @@ OpenAPI/Scalar UI: `/scalar/v1` (development only).
 {
   "ConnectionStrings": { "Postgres": "..." },
   "RabbitMQ": { "Uri": "..." },
-  "Ollama": { "Endpoint": "http://localhost:11434", "ModelId": "qwen2.5-coder:3b" }
+  "Ollama": { "Endpoint": "http://localhost:11434", "ModelId": "qwen2.5-coder:7b-instruct-q4_K_M", "Temperature": 0.2, "MaxOutputTokens": null }
 }
 ```
 

@@ -3,6 +3,7 @@
 //  Copyright (c) Pritom Purkayasta All rights reserved.
 //  FREE TO USE TO CONNECT THE WORLD
 /// </summary>
+using System.Text.RegularExpressions;
 using BlazorMonaco.Editor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -64,6 +65,47 @@ public static class CodeUtils
         "gentle" => Color.Info,
         _ => Color.Default
     };
+
+    public static string GetSeverityIcon(string severity) => severity.ToLowerInvariant() switch
+    {
+        "brutal" => Icons.Material.Filled.Dangerous,
+        "medium" => Icons.Material.Filled.Warning,
+        "gentle" => Icons.Material.Filled.Info,
+        _ => Icons.Material.Filled.Comment
+    };
+
+    // The reviewer prefixes each comment with its source agent, e.g. "[Security] ...".
+    // Merged comments (several agents on one line) concatenate these with blank lines.
+    public static Color GetCategoryColor(string category) => category.ToLowerInvariant() switch
+    {
+        "security" => Color.Error,
+        "bug"      => Color.Warning,
+        "syntax"   => Color.Info,
+        _          => Color.Default
+    };
+
+    private static readonly Regex CategoryLead = new(@"^\[(Security|Bug|Syntax)\]\s*", RegexOptions.Compiled);
+
+    // Split a (possibly merged) comment into its tagged segments so each can show a
+    // coloured category chip with the "[Tag]" prefix stripped from the text.
+    public static IReadOnlyList<(string? Category, string Text)> SplitTaggedComment(string? comment)
+    {
+        if (string.IsNullOrWhiteSpace(comment)) return [];
+
+        var segments = Regex.Split(comment, @"(?=\[(?:Security|Bug|Syntax)\])")
+            .Where(s => !string.IsNullOrWhiteSpace(s));
+
+        var result = new List<(string?, string)>();
+        foreach (var segment in segments)
+        {
+            var match = CategoryLead.Match(segment);
+            if (match.Success)
+                result.Add((match.Groups[1].Value, segment[match.Length..].Trim()));
+            else
+                result.Add((null, segment.Trim()));
+        }
+        return result;
+    }
 
     // --- Decoration / layout interop ---
 

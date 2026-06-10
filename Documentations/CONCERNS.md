@@ -2,7 +2,7 @@
 
 ## Consumer Concurrency: ConcurrentMessageLimit
 
-**Current setting:** `ConcurrentMessageLimit = 1` ... wait, currently set to `16` in `src/Roaster.Consumer/Program.cs`.
+**Current setting:** `ConcurrentMessageLimit = 16` in `src/Roaster.Consumer/Program.cs`.
 
 **The concern:**
 

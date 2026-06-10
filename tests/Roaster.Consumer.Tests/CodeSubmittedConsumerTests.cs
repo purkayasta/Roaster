@@ -116,6 +116,44 @@ public sealed class ReviewProcessorTests : IDisposable
     }
 
     [Fact]
+    public async Task HappyPath_OneAgentCompletedEventPerAgent()
+    {
+        var sub = await SeedSubmission();
+        _ai.Setup(a => a.ReviewCodeAsync(It.IsAny<IReadOnlyList<CodeFileInput>>(), It.IsAny<CancellationToken>()))
+           .ReturnsAsync(new ReviewerResult(ReviewStatus.Success, [])
+           {
+               AgentResults =
+               [
+                   new AgentReviewResult("Security", ReviewStatus.Success, "locked down", 0),
+                   new AgentReviewResult("Bug", ReviewStatus.Success, "one bug", 1),
+                   new AgentReviewResult("Syntax", ReviewStatus.Success, "messy", 2),
+               ]
+           });
+
+        var ctx = FakeConsumeContext.For(new SubmissionCreatedEvent(sub.Id, Guid.NewGuid(), DateTime.UtcNow));
+        await _consumer.Consume(ctx);
+
+        _db.Events.Count(e => e.EventType == EventType.AgentCompleted).Should().Be(3);
+    }
+
+    [Fact]
+    public async Task HappyPath_AgentCompletedEventCarriesSummaryInMetadata()
+    {
+        var sub = await SeedSubmission();
+        _ai.Setup(a => a.ReviewCodeAsync(It.IsAny<IReadOnlyList<CodeFileInput>>(), It.IsAny<CancellationToken>()))
+           .ReturnsAsync(new ReviewerResult(ReviewStatus.Success, [])
+           {
+               AgentResults = [new AgentReviewResult("Bug", ReviewStatus.Success, "found a real bug", 1)]
+           });
+
+        var ctx = FakeConsumeContext.For(new SubmissionCreatedEvent(sub.Id, Guid.NewGuid(), DateTime.UtcNow));
+        await _consumer.Consume(ctx);
+
+        var agentEvent = _db.Events.Single(e => e.EventType == EventType.AgentCompleted);
+        agentEvent.Metadata.Should().Contain("found a real bug");
+    }
+
+    [Fact]
     public async Task HappyPath_ReviewCompletedEventPublished()
     {
         var sub = await SeedSubmission();

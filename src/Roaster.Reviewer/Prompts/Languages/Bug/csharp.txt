@@ -1,0 +1,10 @@
+C# — common bug sources
+- NullReferenceException: FirstOrDefault/SingleOrDefault/dictionary access returning null and used unchecked; nullable warnings disabled hiding it.
+- async void (swallows exceptions outside event handlers); .Result/.Wait()/GetAwaiter().GetResult() deadlocking; missing await leaving fire-and-forget work.
+- IEnumerable enumerated multiple times (re-running a query, re-reading a stream); deferred LINQ executing later than the author expects.
+- Off-by-one in indexing/Substring/ranges; Count vs last-index confusion.
+- Integer division truncation; int overflow where the math needs long.
+- Mutating a collection while iterating it (InvalidOperationException).
+- Reference vs value equality (== on objects); missing Equals/GetHashCode on types used as keys.
+- DateTime.Now vs UtcNow mismatch; mixing local and UTC.
+- Using a disposed object; IDisposable leaked; using over a stream/reader that closes too early.

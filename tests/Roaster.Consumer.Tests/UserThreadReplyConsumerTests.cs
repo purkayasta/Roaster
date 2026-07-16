@@ -98,7 +98,7 @@ public sealed class ReplyProcessorTests : IDisposable
                 It.IsAny<string>(), It.IsAny<string>(),
                 It.IsAny<IList<AiChatMessage>>(), It.IsAny<string>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync("AI response here");
+            .ReturnsAsync(new AiReplyResult("AI response here", new TokenUsage(10, 5)));
 
         var ctx = FakeConsumeContext.For(new ReplyEvent(thread.Id, sub.Id, 5, Guid.NewGuid(), DateTime.UtcNow));
         await _consumer.Consume(ctx);
@@ -119,7 +119,7 @@ public sealed class ReplyProcessorTests : IDisposable
                 It.IsAny<string>(), It.IsAny<string>(),
                 It.IsAny<IList<AiChatMessage>>(), It.IsAny<string>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync("reply");
+            .ReturnsAsync(new AiReplyResult("reply", new TokenUsage(10, 5)));
 
         var ctx = FakeConsumeContext.For(new ReplyEvent(thread.Id, sub.Id, 5, Guid.NewGuid(), DateTime.UtcNow));
         await _consumer.Consume(ctx);
@@ -143,7 +143,7 @@ public sealed class ReplyProcessorTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .Callback<string, string, IList<AiChatMessage>, string, CancellationToken>(
                 (_, _, history, _, _) => capturedHistory = history)
-            .ReturnsAsync("ok");
+            .ReturnsAsync(new AiReplyResult("ok", new TokenUsage(10, 5)));
 
         var ctx = FakeConsumeContext.For(new ReplyEvent(thread.Id, sub.Id, 5, Guid.NewGuid(), DateTime.UtcNow));
         await _consumer.Consume(ctx);

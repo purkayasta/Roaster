@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Roaster — AI Pipeline Deep Dive</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"
+        integrity="sha384-qX9VvWkP79m/O121ZE6sOYp0nf/pldQgtvWDbkpzi+3mUo4Wn4Ix4cFzNPay3VaB"
+        crossorigin="anonymous"></script>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #30363d;
+    --text: #c9d1d9; --muted: #8b949e; --accent: #58a6ff; --warn: #f0883e; --good: #3fb950; --code: #1a2129;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, Segoe UI, Helvetica, Arial, sans-serif; margin: 0; padding: 24px 40px 80px; line-height: 1.55; }
+  h1 { font-size: 26px; border-bottom: 2px solid var(--border); padding-bottom: 10px; }
+  h2 { font-size: 19px; color: var(--accent); margin-top: 40px; border-left: 4px solid var(--accent); padding-left: 10px; }
+  h3 { font-size: 15px; color: var(--text); margin-top: 22px; }
+  h4 { font-size: 13.5px; color: var(--muted); margin-top: 16px; }
+  p, li { font-size: 14px; }
+  code, .mono { font-family: SFMono-Regular, Menlo, Consolas, monospace; background: var(--code); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  pre { background: var(--code); border: 1px solid var(--border); border-radius: 8px; padding: 14px; overflow-x: auto; font-size: 13px; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0 18px; font-size: 13.5px; }
+  th, td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--panel); color: var(--accent); }
+  .box { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; margin: 14px 0; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 5px; font-size: 11.5px; font-weight: 600; margin-right: 6px; }
+  .tag.limit { background: #f8514933; color: #f85149; border: 1px solid #f85149; }
+  .tag.ok { background: #3fb95033; color: var(--good); border: 1px solid var(--good); }
+  .qa { border-left: 3px solid var(--warn); background: var(--panel); padding: 10px 16px; margin: 10px 0; border-radius: 0 8px 8px 0; }
+  .qa b { color: var(--warn); }
+  .toc { columns: 2; column-gap: 40px; }
+  .toc a { color: var(--accent); text-decoration: none; display: block; padding: 2px 0; font-size: 13.5px; }
+  a { color: var(--accent); }
+  .mermaid { background: var(--code); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 14px 0; }
+</style>
+</head>
+<body>
+
+<h1>Roaster — AI Pipeline Deep Dive</h1>
+<p class="mono" style="color:var(--muted)">Scope: the AI part only. Backend/frontend plumbing is in BACKEND.md / FRONTEND.md — not repeated here.</p>
+
+<div class="box toc">
+<a href="#one">1. The AI part in one sentence</a>
+<a href="#where">2. Where the AI code lives</a>
+<a href="#review">3. Initial review — file-by-file</a>
+<a href="#reply">4. Thread replies — the second persona</a>
+<a href="#agents">5. "Agents" — precise language</a>
+<a href="#tools">6. Tool-calling — tried and shelved</a>
+<a href="#parser">7. Defensive JSON parsing</a>
+<a href="#flow">8. System flow (Mermaid)</a>
+<a href="#qa">9. Likely interview questions</a>
+</div>
+
+<h2 id="one">1. The AI part in one sentence</h2>
+<div class="box">
+<code>Roaster.Reviewer</code> is a small class library — <code>AiReviewService</code> — that talks to a
+<b>local Ollama model</b> through <b>Semantic Kernel's <code>IChatCompletionService</code></b>. It reviews a
+submission <b>one file at a time</b> (not one prompt for everything), using one of <b>two fixed system prompts</b>
+depending on what's being asked: an initial review, or a reply inside an existing comment thread.
+<p style="margin-bottom:0">There is no agent framework, no planner, no tool use, no memory store. Two prompt
+<i>personas</i> sharing one call mechanism — that's the whole "multi-agent" story, and it's worth being precise
+about that distinction going into an interview (§5).</p>
+</div>
+
+<h2 id="where">2. Where the AI code lives</h2>
+<table>
+<tr><th>Piece</th><th>File</th><th>Role</th></tr>
+<tr><td>Interface</td><td><code>Abstractions/IAiReviewService.cs</code></td><td><code>ReviewCodeAsync(files)</code> and <code>ReplyToThreadAsync(...)</code> — the only two entry points</td></tr>
+<tr><td>Implementation</td><td><code>Services/AiReviewService.cs</code></td><td>Owns the per-file loop, prompt selection, template rendering, calling Ollama, merging results</td></tr>
+<tr><td>Defensive parser</td><td><code>Services/ReviewResponseParser.cs</code></td><td>Turns a raw model response into a typed result, never throws</td></tr>
+<tr><td>Prompts (embedded)</td><td><code>Prompts/roaster.txt</code>, <code>replier.txt</code>, <code>file-message.txt</code></td><td>The two system-prompt personas + one structural user-message template</td></tr>
+<tr><td>DI wiring</td><td><code>ReviewerExtensions.cs</code></td><td>Builds the Ollama connector + <code>AiReviewService</code> singleton</td></tr>
+<tr><td>Config</td><td><code>Options/OllamaOptions.cs</code></td><td><code>Endpoint</code>, <code>ModelId</code>, <code>ContextLength</code> — all required, all from config</td></tr>
+</table>
+<p>Callers: <code>CodeReviewService.cs</code> (initial review) and <code>ThreadReplyService.cs</code> (thread
+replies) — both in <code>Roaster.Consumer</code>, both running in the background worker. The API process never
+calls the AI directly; it only publishes an event.</p>
+
+<h2 id="review">3. Initial review — file-by-file, not one giant prompt</h2>
+
+<h3>3.1 Why per-file</h3>
+<p>A submission can carry multiple files (<code>Submission.Payloads: List&lt;Payload&gt;</code>). This used to
+concatenate <b>every</b> file into a single prompt — one call, one shared context window across all files. That
+broke down as total size grew: the whole submission's size determined whether a single call would overflow the
+model's context. It's now <b>one Ollama call per file</b>, so submission size no longer matters — only each
+individual file's size does.</p>
+
+<h3>3.2 The actual loop — <code>AiReviewService.ReviewCodeAsync</code></h3>
+<pre>foreach (file in files):
+    history = new ChatHistory(roaster.txt)              # fresh system prompt each time
+    history.AddUserMessage( render(file-message.txt, { fileName, language, numberedContent }) )
+    response = chat.GetChatMessageContentsAsync(history, executionSettings)
+    result = ReviewResponseParser.Parse(response)
+    if result failed to parse → log + skip this file, keep going
+    else → pool its comments, keep its summary (prefixed with the file name)
+
+overall status = Success if ANY file parsed, Failed only if EVERY file failed</pre>
+<p>Each file is judged in <b>complete isolation</b> — the model reviewing <code>Bar.cs</code> never sees
+<code>Foo.cs</code> in the same call. That's the direct trade-off of per-file chunking: it fixed the
+context-overflow risk but removed any possibility of cross-file reasoning. Tool-calling-based cross-file
+retrieval was evaluated as the fix and shelved — see §6.</p>
+
+<h3>3.3 Building the per-file message — line numbers matter</h3>
+<pre>   1 | using System;
+   2 |
+   3 | public class Foo</pre>
+<p>This is <b>the entire reason the model can return accurate <code>lineNumber</code> values</b> — it's echoing
+numbers it was literally shown in the prompt, not computing them. The numbered content, file name, and language
+are rendered through an SK prompt template (<code>file-message.txt</code>, using <code>{{"{{$fileName}}"}}</code> /
+<code>{{"{{$language}}"}}</code> / <code>{{"{{$numberedContent}}"}}</code> placeholders) instead of hand-built
+string concatenation — SK's <code>KernelPromptTemplateFactory</code> owns the declarative shape, the
+line-numbering itself stays procedural code.</p>
+
+<h3>3.4 The system prompt (<code>roaster.txt</code>) — the "review" persona</h3>
+<ul>
+<li>Persona: senior engineer doing a real review, who can't resist a sarcastic joke on every comment.</li>
+<li>Hard requirement: <b>return only a JSON object</b>, no markdown fences, no prose outside it:
+<pre>{ "summary": "...", "comments": [{ "fileName": "X.cs", "lineNumber": 5, "comment": "...", "severity": 10 }] }</pre></li>
+<li><code>severity</code> is a fixed two-value enum: <code>10</code> = should-fix, <code>20</code> = must-fix.</li>
+<li><code>fileName</code> must match the file header exactly — lets the consumer attribute a comment back to the
+right <code>Payload</code> row when merging results across files.</li>
+<li>If nothing is wrong: empty <code>comments</code> array + a genuinely positive summary — the model is told not
+to invent problems to pad the response.</li>
+</ul>
+
+<h3>3.5 Execution settings — <code>num_ctx</code> is explicit, not assumed</h3>
+<p>Every call passes <code>OllamaPromptExecutionSettings { ExtensionData = { ["num_ctx"] = contextLength } }</code>,
+where <code>contextLength</code> comes from <code>Ollama:ContextLength</code> in config — a <b>required</b> field,
+no silent default in code. Verified end-to-end by intercepting the real outgoing HTTP request: the value lands
+under <code>options.num_ctx</code> in Ollama's <code>/api/chat</code> body. Required per-deployment because
+different models need different context budgets.</p>
+<p><span class="tag limit">Still open</span> Nothing counts tokens before sending. If a single file's content
+alone exceeds <code>ContextLength</code>, Ollama still truncates silently — chunking shrank the blast radius from
+"whole submission" to "one file," it didn't eliminate the risk.</p>
+
+<h3>3.6 Merging results back together</h3>
+<p><code>ReviewCodeAsync</code> returns one <code>ReviewerResult</code> for the whole submission: every file's
+comments pooled into one list, each file's summary joined as <code>"fileName: summary"</code>, and the whole
+review is only marked <code>Failed</code> if <b>every</b> file's response failed to parse — one bad file doesn't
+sink the other nine. The consumer defaults any comment missing a <code>fileName</code> to the first file in the
+submission (defensive fallback, logged as a warning).</p>
+
+<h2 id="reply">4. Thread replies — the second persona</h2>
+
+<h3>4.1 When this runs</h3>
+<p>A user replies to a specific line comment → API creates a <code>ThreadReply</code> row + publishes a
+<code>ReplyEvent</code> → <code>ThreadReplyService.ProcessAsync</code> (in the Consumer) picks it up.</p>
+
+<h3>4.2 Building the call</h3>
+<pre>code            = ALL of the submission's files' content, joined together        ← see the caveat below
+originalComment = the review comment that started this thread (looked up by LineNumber)
+priorHistory    = every ThreadReply on this thread so far, mapped user/assistant, oldest first
+userMessage     = the newest user reply (the one that triggered this event)
+
+chatHistory = new ChatHistory(replier.txt)
+chatHistory.AddUserMessage("Code:\n{code}\n\nOriginal comment: {originalComment}")
+chatHistory.AddAssistantMessage(originalComment)
+foreach prior message → chatHistory.Add{User|Assistant}Message(...)
+chatHistory.AddUserMessage(userMessage)
+
+reply = chat.GetChatMessageContentsAsync(chatHistory, executionSettings)</pre>
+<div class="qa"><b>Honest gap worth knowing:</b> <code>code</code> is every file in the submission concatenated
+together, not just the one file the comment lives in. For a multi-file submission this resends the whole
+submission's code on every single reply — larger prompts than necessary, and another way a big enough submission
+could threaten the context window on this specific path.</div>
+
+<h3>4.3 The system prompt (<code>replier.txt</code>) — the "reply" persona</h3>
+<ul>
+<li>Persona: the same reviewer, now defending their original comment against pushback — sarcastic, argumentative, not conceding easily.</li>
+<li><b>Plain text only</b> — explicitly no JSON, no markdown headers. Deliberate contrast with the review prompt: a conversational reply has no structured contract to satisfy, so there's nothing for a parser to do — the raw model output <i>is</i> the saved <code>ThreadReply.Content</code>.</li>
+<li>Explicitly told not to repeat the original comment verbatim — escalate or redirect instead.</li>
+</ul>
+
+<h3>4.4 Why two separate prompts instead of one shared one</h3>
+<p>Different output contracts (strict JSON vs. free text) and different conversational shapes (single-shot review
+vs. multi-turn argument) don't compress into one prompt without one of them fighting the other's instructions.
+Two small, single-purpose prompt files means no runtime branching logic inside a shared prompt, no risk of
+JSON-mode instructions leaking into a reply.</p>
+
+<h2 id="agents">5. "Agents" — precise language for the interview</h2>
+<div class="qa">
+<b>If asked "how many agents does this use":</b> there are two distinct system-prompt configurations (review vs.
+reply), not two autonomous agents. Both go through the exact same underlying mechanism —
+<code>IChatCompletionService.GetChatMessageContentsAsync</code> — with a different <code>ChatHistory</code> seed
+and a different parsing strategy afterward. Neither one calls tools, runs a planning loop, maintains memory
+beyond the conversation history explicitly passed in, or decides on its own what to do next. All the "decision"
+logic is in application code (<code>AiReviewService</code>, <code>CodeReviewService</code>,
+<code>ThreadReplyService</code>), not inside the model. "Two agents" is fine as shorthand as long as you can
+immediately clarify it's two prompt personas over one shared client — that precision is exactly what a good
+interviewer will probe.
+</div>
+
+<h2 id="tools">6. What was tried and shelved — tool-calling doesn't work here</h2>
+<p>Before settling on the per-file/two-persona design, real function-calling was tested as a way to let the model
+fetch other files on demand (fixing the cross-file blind spot from §3.2). Tested directly, twice, against the
+actual models this project runs:</p>
+<ul>
+<li>Raw Ollama <code>/api/chat</code> with a <code>tools</code> array → model printed function-call-shaped JSON as plain <b>text</b>, <code>tool_calls</code> field never populated.</li>
+<li>Full Semantic Kernel <code>Kernel</code> + <code>FunctionChoiceBehavior.Auto()</code> with a real registered function → same degradation; the function was never actually invoked.</li>
+<li><code>ollama show qwen2.5-coder:3b</code> claims a <code>tools</code> capability — misleading in practice given the above. <code>deepseek-coder:1.3b</code> (the local dev default) doesn't even claim it.</li>
+</ul>
+<p><b>Conclusion:</b> real tool-calling isn't usable with these models, so cross-file retrieval and tool-forced
+structured output were both shelved rather than half-built on a foundation that doesn't hold. What shipped
+instead — per-file chunking, explicit <code>num_ctx</code>, prompt templates — works with the models actually in
+use today.</p>
+
+<h2 id="parser">7. Defensive JSON parsing — the real reliability layer</h2>
+<p>A 3B-class local model is not a guaranteed structured-output engine. <code>ReviewResponseParser.Parse</code> is
+a 3-stage fallback that never throws:</p>
+<div class="box">
+1. Direct <code>JsonSerializer.Deserialize</code> on the raw response.<br>
+2. Strip a &#96;&#96;&#96;json ... &#96;&#96;&#96; fence via regex, retry.<br>
+3. Take the substring from the first <code>{</code> to the last <code>}</code>, retry.<br>
+4. Give up → <code>ReviewStatus.Failed</code>, empty comment list, logged with the raw response (truncated to 500 chars).
+</div>
+<p>This is the single most load-bearing piece of resilience in the whole AI path — without it, any time the model
+wraps its JSON in a sentence or a code fence, the entire file's review would hard-fail instead of degrading
+gracefully.</p>
+
+<h2 id="flow">8. System flow</h2>
+
+<h3>8.1 Initial review — submission to saved review</h3>
+<div class="mermaid">
+flowchart TD
+    A["Browser: POST /api/submissions"] --> B["Roaster.Api: validate, save Submission (Status=Submitted)"]
+    B --> C["Publish SubmissionCreatedEvent to RabbitMQ 'code-submitted'"]
+    C --> D["Roaster.Consumer: CodeReviewService.ProcessAsync"]
+    D --> E["Status to Processing"]
+    E --> F["submission.Payloads to List of CodeFileInput"]
+    F --> G{"AiReviewService.ReviewCodeAsync"}
+
+    subgraph PerFile ["Per file, one at a time"]
+        G1["Render file-message.txt template<br/>fileName, language, numbered lines"] --> G2["ChatHistory = roaster.txt + file message"]
+        G2 --> G3["Ollama call<br/>num_ctx from config"]
+        G3 --> G4["ReviewResponseParser.Parse<br/>3-stage fallback"]
+        G4 -->|parsed OK| G5["Pool comments + summary"]
+        G4 -->|failed| G6["Skip this file, log warning"]
+    end
+
+    G --> G1
+    G5 --> H["Next file..."]
+    G6 --> H
+    H -->|more files| G1
+    H -->|done| I{"Any file parsed OK?"}
+    I -->|yes| J["Save Review + Comments JSONB + ReviewMetrics<br/>Status to Completed"]
+    I -->|no| K["Status to Failed, log Event Failed"]
+    J --> L["Publish ReviewCompletedEvent"]
+    K --> M["Rethrow, MassTransit retry<br/>exponential 10s to 120s, 3x"]
+    L --> N["Browser polls GET /api/submissions/id/review<br/>204 until ready, 200 when Completed"]
+</div>
+
+<h3>8.2 Thread reply — user pushes back on a comment</h3>
+<div class="mermaid">
+sequenceDiagram
+    participant U as Browser
+    participant API as Roaster.Api
+    participant MQ as RabbitMQ user-thread-reply
+    participant C as ThreadReplyService
+    participant AI as AiReviewService
+    participant O as Ollama replier.txt persona
+
+    U->>API: POST .../lines/line/threads (reply text)
+    API->>API: Save ThreadReply IsAiReply=false
+    API->>MQ: Publish ReplyEvent
+    MQ->>C: ProcessAsync(msg)
+    C->>C: Load thread + all prior replies + submission code (all files joined)
+    C->>AI: ReplyToThreadAsync(code, originalComment, priorHistory, newMessage)
+    AI->>O: ChatHistory(replier.txt) + original comment + full history + new message
+    O-->>AI: plain-text reply, no JSON, no parsing needed
+    AI-->>C: reply text
+    C->>C: Save ThreadReply IsAiReply=true, log Event AiReplied
+    U->>API: GET /api/threads/id/replies
+    API-->>U: full conversation, oldest first
+</div>
+
+<h2 id="qa">9. Likely interview questions this doc answers</h2>
+<div class="qa"><b>"Walk me through what happens between hitting Submit and seeing a review."</b> → §8.1</div>
+<div class="qa"><b>"How does multi-file review actually work under the hood?"</b> → §3</div>
+<div class="qa"><b>"You mentioned agents — how many, and what do they actually do?"</b> → §5</div>
+<div class="qa"><b>"What happens if the model doesn't return valid JSON?"</b> → §7</div>
+<div class="qa"><b>"Did you consider giving the model tools to look at other files?"</b> → §6</div>
+<div class="qa"><b>"How do you control how much code the model can see at once?"</b> → §3.5</div>
+<div class="qa"><b>"What's the weakest part of the reply flow?"</b> → §4.2 (resending full submission code per reply)</div>
+
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: 'dark', themeVariables: {
+    background: '#0d1117', primaryColor: '#161b22', primaryTextColor: '#c9d1d9',
+    primaryBorderColor: '#30363d', lineColor: '#58a6ff', secondaryColor: '#1a2129',
+    tertiaryColor: '#161b22'
+  }});
+</script>
+
+</body>
+</html>

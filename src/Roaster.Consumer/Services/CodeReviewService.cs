@@ -157,6 +157,12 @@ public sealed class CodeReviewService(
                 SessionId = submission.SessionId,
                 EventType = EventType.ReviewCompleted,
                 CorrelationId = msg.CorrelationId,
+                Metadata = JsonSerializer.Serialize(new
+                {
+                    promptTokens = aiResult.Usage?.PromptTokens ?? 0,
+                    completionTokens = aiResult.Usage?.CompletionTokens ?? 0,
+                    totalTokens = aiResult.Usage?.TotalTokens ?? 0
+                }),
                 OccurredAt = DateTime.UtcNow
             });
 

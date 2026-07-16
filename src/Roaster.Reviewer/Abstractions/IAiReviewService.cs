@@ -13,7 +13,7 @@ public interface IAiReviewService
         IReadOnlyList<CodeFileInput> files,
         CancellationToken ct = default);
 
-    Task<string> ReplyToThreadAsync(
+    Task<AiReplyResult> ReplyToThreadAsync(
         string code,
         string originalComment,
         IList<AiChatMessage> history,

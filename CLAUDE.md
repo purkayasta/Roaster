@@ -7,6 +7,9 @@ Detailed documentation lives in `Documentations/`:
 - **[FRONTEND.md](Documentations/FRONTEND.md)** — Blazor WASM structure, components, services, conventions
 - **[RUNNING.md](Documentations/RUNNING.md)** — local setup, Docker Compose, migrations, test commands
 
+Root-level docs:
+- **[AI-MINDMAP.md](AI-MINDMAP.md)** — deep dive into the AI/Ollama review pipeline: per-file chunking, the two prompt personas (review vs. reply), defensive JSON parsing, `num_ctx` config, and why tool-calling was tried and shelved. Includes a Mermaid system-flow diagram.
+
 ---
 
 ## Solution Structure

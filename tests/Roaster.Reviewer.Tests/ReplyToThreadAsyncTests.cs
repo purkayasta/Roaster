@@ -18,7 +18,7 @@ public sealed class ReplyToThreadAsyncTests
 {
     private static AiReviewService BuildService(
         Mock<IChatCompletionService> chatMock)
-        => new(chatMock.Object, NullLogger<AiReviewService>.Instance);
+        => new(chatMock.Object, 4096, NullLogger<AiReviewService>.Instance);
 
     private static void SetupChatReply(Mock<IChatCompletionService> mock, string reply)
     {
@@ -37,7 +37,7 @@ public sealed class ReplyToThreadAsyncTests
         ChatHistory? captured = null;
         var mock = new Mock<IChatCompletionService>();
         mock.Setup(c => c.GetChatMessageContentsAsync(
-                It.IsAny<ChatHistory>(), null, null, default))
+                It.IsAny<ChatHistory>(), It.IsAny<PromptExecutionSettings?>(), null, default))
             .Callback<ChatHistory, PromptExecutionSettings?, Kernel?, CancellationToken>(
                 (h, _, _, _) => captured = h)
             .ReturnsAsync([new ChatMessageContent(AuthorRole.Assistant, "reply")]);
@@ -63,7 +63,7 @@ public sealed class ReplyToThreadAsyncTests
         ChatHistory? captured = null;
         var mock = new Mock<IChatCompletionService>();
         mock.Setup(c => c.GetChatMessageContentsAsync(
-                It.IsAny<ChatHistory>(), null, null, default))
+                It.IsAny<ChatHistory>(), It.IsAny<PromptExecutionSettings?>(), null, default))
             .Callback<ChatHistory, PromptExecutionSettings?, Kernel?, CancellationToken>(
                 (h, _, _, _) => captured = h)
             .ReturnsAsync([new ChatMessageContent(AuthorRole.Assistant, "ok")]);
@@ -82,7 +82,7 @@ public sealed class ReplyToThreadAsyncTests
         ChatHistory? captured = null;
         var mock = new Mock<IChatCompletionService>();
         mock.Setup(c => c.GetChatMessageContentsAsync(
-                It.IsAny<ChatHistory>(), null, null, default))
+                It.IsAny<ChatHistory>(), It.IsAny<PromptExecutionSettings?>(), null, default))
             .Callback<ChatHistory, PromptExecutionSettings?, Kernel?, CancellationToken>(
                 (h, _, _, _) => captured = h)
             .ReturnsAsync([new ChatMessageContent(AuthorRole.Assistant, "ok")]);

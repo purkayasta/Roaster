@@ -37,7 +37,7 @@ public sealed class ReviewProcessorTests : IDisposable
         _publisher = new Mock<IPublishEndpoint>();
         _ai = new Mock<IAiReviewService>();
 
-        var ollamaOpts = Options.Create(new OllamaOptions { Endpoint = "http://localhost:11434", ModelId = "test-model" });
+        var ollamaOpts = Options.Create(new OllamaOptions { Endpoint = "http://localhost:11434", ModelId = "test-model", ContextLength = 4096 });
         var service = new CodeReviewService(_db, _publisher.Object, _ai.Object, ollamaOpts,
             NullLogger<CodeReviewService>.Instance);
         _consumer = new ReviewProcessor(service);

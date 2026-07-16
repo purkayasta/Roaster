@@ -112,7 +112,7 @@ OpenAPI/Scalar UI: `/scalar/v1` (development only).
 | Entity | PK | Key Columns | Notes |
 |---|---|---|---|
 | `Session` | UUID | `Name varchar(255)`, `CreatedAt`, `IsActive bool` | Soft delete via `IsActive`; one session → one submission |
-| `Submission` | bigserial | `SessionId UUID (unique FK)`, `Payload JSONB`, `Status smallint` | Unique on SessionId |
+| `Submission` | bigserial | `SessionId UUID (unique FK)`, `Payloads JSONB[]`, `Status smallint` | Unique on SessionId; `Payloads` is a list — one submission can hold multiple files |
 | `Review` | bigserial | `SubmissionId FK`, `Summary text`, `Comments JSONB` | Created by consumer |
 | `CommentThread` | bigserial | `ReviewId FK`, `LineNumber int`, `Status smallint` | Unique (ReviewId, LineNumber); default Status=Unresolved |
 | `ThreadReply` | bigserial | `ThreadId FK`, `Content text`, `IsAiReply bool` | User and AI messages |
@@ -140,8 +140,8 @@ OpenAPI/Scalar UI: `/scalar/v1` (development only).
 **Service layer.** `Roaster.Api` has a `Services/` folder with one service per resource (`SessionService`, `SubmissionService`, `ReviewService`, `ThreadService`, `EventService`). All business logic and DB access lives in the services. Endpoints are thin — they call one service method and return the result directly. Services return `ServiceResult<T>` (or non-generic `ServiceResult` for void operations), which implements `IResult` so endpoints can `return await service.XxxAsync(...)` without any manual status mapping. The only exception is endpoints that need a custom HTTP response code (e.g. `AcceptedAtRoute`) — they check `result.Status` once before overriding.
 
 **JSONB owned types.**
-- `Submission.Payload` → `CodePayload { Content, Language }` — single JSONB column
-- `Review.Comments` → `List<ReviewLineComment>` — JSONB array
+- `Submission.Payloads` → `List<Payload { FileName, Content, Language }>` — JSONB array, one entry per file (multi-file sessions)
+- `Review.Comments` → `List<ReviewLineComment { FileName, LineNumber, Comment, Severity }>` — JSONB array
 - `Event.Metadata` — JSONB for arbitrary event context
 
 **Session soft delete.** `Session.IsActive` defaults to `true`. `DELETE /api/sessions/{id}` sets it `false`. All `GET /api/sessions` queries filter `IsActive = true`.

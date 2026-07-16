@@ -22,7 +22,7 @@ public static class ReviewerExtensions
             var opts         = sp.GetRequiredService<IOptions<OllamaOptions>>().Value;
             var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
             var chat         = new OllamaChatCompletionService(opts.ModelId, new Uri(opts.Endpoint), loggerFactory);
-            return new AiReviewService(chat, loggerFactory.CreateLogger<AiReviewService>());
+            return new AiReviewService(chat, opts.ContextLength, loggerFactory.CreateLogger<AiReviewService>());
         });
         return services;
     }

@@ -3,6 +3,7 @@
 //  Copyright (c) Pritom Purkayasta All rights reserved.
 //  FREE TO USE TO CONNECT THE WORLD
 /// </summary>
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Roaster.Contracts.Events;
 using Roaster.Data.Context;
@@ -53,12 +54,13 @@ public sealed class ThreadReplyService(
 
         var aiReply = await ai.ReplyToThreadAsync(code, originalComment, priorHistory, userReply, ct);
 
-        logger.LogInformation("AI reply received for thread {ThreadId}, length {Length} chars", msg.ThreadId, aiReply.Length);
+        logger.LogInformation("AI reply received for thread {ThreadId}, length {Length} chars, {TotalTokens} total tokens",
+            msg.ThreadId, aiReply.Content.Length, aiReply.Usage.TotalTokens);
 
         db.ThreadReplies.Add(new ThreadReply
         {
             ThreadId = thread.Id,
-            Content = aiReply,
+            Content = aiReply.Content,
             IsAiReply = true,
             CreatedAt = DateTime.UtcNow
         });
@@ -69,6 +71,12 @@ public sealed class ThreadReplyService(
             SessionId = thread.Review.Submission.SessionId,
             EventType = EventType.AiReplied,
             CorrelationId = msg.CorrelationId,
+            Metadata = JsonSerializer.Serialize(new
+            {
+                promptTokens = aiReply.Usage.PromptTokens,
+                completionTokens = aiReply.Usage.CompletionTokens,
+                totalTokens = aiReply.Usage.TotalTokens
+            }),
             OccurredAt = DateTime.UtcNow
         });
 

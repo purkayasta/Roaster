@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Moq;
-using Roaster.Reviewer.Abstractions;
 using Roaster.Reviewer.Models;
 using Roaster.Reviewer.Services;
 

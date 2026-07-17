@@ -5,7 +5,6 @@
 /// </summary>
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Hosting;
 using Roaster.Consumer.Processors;
 using Roaster.Consumer.Services;
 using Roaster.Data.Context;

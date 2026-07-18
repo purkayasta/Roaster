@@ -74,6 +74,16 @@ public sealed class ReviewResponseParserTests
     }
 
     [Fact]
+    public void RawNewlineInsideStringValue_RepairedAndParsed()
+    {
+        var raw = "{\"summary\":\"ok\",\"comments\":[{\"lineNumber\":2,\"comment\":\"Line one\nLine two\",\"severity\":10}]}";
+        var result = ReviewResponseParser.Parse(raw, _logger);
+
+        result.Status.Should().Be(ReviewStatus.Success);
+        result.LineComments[0].Comment.Should().Be("Line one\nLine two");
+    }
+
+    [Fact]
     public void CommentWithLineNumberZero_ExcludedFromResult()
     {
         var raw = """{"summary":"s","comments":[{"lineNumber":0,"comment":"bad","severity":20},{"lineNumber":5,"comment":"ok","severity":10}]}""";

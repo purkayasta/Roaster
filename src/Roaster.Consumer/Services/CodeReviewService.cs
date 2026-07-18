@@ -95,8 +95,8 @@ public sealed class CodeReviewService(
 
             if (aiResult.Status is ReviewStatus.Failed)
             {
-                var message = $"AI returned unparseable response for submission {msg.SubmissionId}";
-                logger.LogWarning(message);
+                var error = aiResult.Error ?? "AI returned an unparseable response with no further detail.";
+                logger.LogWarning("AI review failed for submission {Id}: {Error}", msg.SubmissionId, error);
                 submission.Status = SubmissionStatus.Failed;
                 db.Events.Add(new Event
                 {
@@ -104,7 +104,7 @@ public sealed class CodeReviewService(
                     SessionId = submission.SessionId,
                     EventType = EventType.Failed,
                     CorrelationId = msg.CorrelationId,
-                    Metadata = JsonSerializer.Serialize(new { message }),
+                    Metadata = JsonSerializer.Serialize(new { message = error }),
                     OccurredAt = DateTime.UtcNow
                 });
                 await db.SaveChangesAsync(ct);

@@ -35,6 +35,7 @@ public sealed class AiReviewService(
         var systemPrompt = PromptLoader.Roaster;
         var allComments = new List<AiLineComment>();
         var summaries = new List<string>();
+        var errors = new List<string>();
         var totalUsage = TokenUsage.Zero;
         var anySucceeded = false;
 
@@ -51,7 +52,8 @@ public sealed class AiReviewService(
             logger.LogInformation("AI response received for {FileName}, raw length {Length} chars, {PromptTokens} prompt / {CompletionTokens} completion tokens",
                 file.FileName, raw.Length, usage.PromptTokens, usage.CompletionTokens);
 
-            if (usage.PromptTokens > 0 && usage.PromptTokens >= contextLength)
+            var overContextLength = usage.PromptTokens > 0 && usage.PromptTokens >= contextLength;
+            if (overContextLength)
                 logger.LogWarning(
                     "Prompt for {FileName} used {PromptTokens} tokens, at or over the configured context length {ContextLength} — content may have been truncated by Ollama",
                     file.FileName, usage.PromptTokens, contextLength);
@@ -59,7 +61,11 @@ public sealed class AiReviewService(
             var result = ReviewResponseParser.Parse(raw, logger);
             if (result.Status is ReviewStatus.Failed)
             {
+                var reason = overContextLength
+                    ? $"{file.FileName}: prompt used {usage.PromptTokens}/{contextLength} context tokens (input likely too large for the model) — {result.Error}"
+                    : $"{file.FileName}: {result.Error}";
                 logger.LogWarning("Skipping unparseable AI response for {FileName}", file.FileName);
+                errors.Add(reason);
                 continue;
             }
 
@@ -73,7 +79,12 @@ public sealed class AiReviewService(
         logger.LogInformation("AI review parsed: {CommentCount} line comments across {FileCount} file(s), {TotalTokens} total tokens",
             allComments.Count, files.Count, totalUsage.TotalTokens);
 
-        return new ReviewerResult(status, allComments, summaries.Count > 0 ? string.Join('\n', summaries) : null, totalUsage);
+        return new ReviewerResult(
+            status,
+            allComments,
+            summaries.Count > 0 ? string.Join('\n', summaries) : null,
+            totalUsage,
+            errors.Count > 0 ? string.Join('\n', errors) : null);
     }
 
     public async Task<AiReplyResult> ReplyToThreadAsync(

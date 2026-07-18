@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Roaster — Documentation</title>
+<script
+  src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"
+  integrity="sha384-T/0lMUdJpd2S1ZHtRiofG3htU3xPCrFVeAQ1UUE2TJwlEJSV5NUwn30kP28n238E"
+  crossorigin="anonymous"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --code-bg: #010409;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+  }
+  nav {
+    width: 220px;
+    flex-shrink: 0;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    overflow-y: auto;
+    padding: 24px 16px;
+    border-right: 1px solid var(--border);
+  }
+  nav h1 { font-size: 1.1rem; margin: 0 0 16px; }
+  nav a {
+    display: block;
+    color: var(--muted);
+    text-decoration: none;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 0.88rem;
+  }
+  nav a:hover { background: var(--panel); color: var(--text); }
+  main { flex: 1; max-width: 980px; padding: 32px 48px 96px; }
+  section { margin-bottom: 56px; }
+  h1, h2, h3 { color: #fff; }
+  h2 { border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-top: 0; }
+  h3 { color: var(--accent); }
+  code {
+    background: var(--code-bg);
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 0.85em;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 0.9rem; }
+  th, td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
+  th { background: var(--panel); }
+  .mermaid { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin: 16px 0; }
+  ul, ol { line-height: 1.6; }
+  .muted { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<nav>
+  <h1>Roaster</h1>
+  <a href="#overview">1. Overview</a>
+  <a href="#architecture">2. Architecture</a>
+  <a href="#backend">3. Backend</a>
+  <a href="#frontend">4. Frontend</a>
+  <a href="#ai-pipeline">5. AI Pipeline</a>
+  <a href="#data-model">6. Data Model</a>
+  <a href="#running">7. Running</a>
+</nav>
+
+<main>
+
+<section id="overview">
+<h2>1. Overview</h2>
+<p>Roaster is an AI-powered code review tool: paste code into a Monaco editor, submit it, and a local Ollama LLM returns sarcastic-but-accurate inline line comments. Reply to any comment and the AI argues back in a threaded conversation.</p>
+
+<h3>Stack</h3>
+<table>
+<tr><th>Layer</th><th>Technology</th></tr>
+<tr><td>Frontend</td><td>Blazor WebAssembly (.NET 10), Monaco Editor, MudBlazor 9.4</td></tr>
+<tr><td>API</td><td>ASP.NET Core 10 Minimal APIs</td></tr>
+<tr><td>Worker</td><td>.NET Worker Service + MassTransit 8</td></tr>
+<tr><td>AI</td><td>Semantic Kernel 1.74.0 → Ollama (default <code>qwen2.5-coder:3b</code>)</td></tr>
+<tr><td>Broker</td><td>RabbitMQ 4</td></tr>
+<tr><td>Database</td><td>PostgreSQL 17 + EF Core 10 (JSONB payloads)</td></tr>
+<tr><td>Migrations</td><td>DbUp 7 (plain SQL, one-shot init container)</td></tr>
+</table>
+
+<h3>Solution Structure</h3>
+<pre><code>Roaster.slnx
+├── Backend/    Roaster.Api · Roaster.Consumer · Roaster.Reviewer · Roaster.Data · Roaster.Contracts · Roaster.Migration
+├── Frontend/   Roaster.Editor
+└── Tests/      Roaster.Api.Tests · Roaster.Consumer.Tests · Roaster.Data.Tests · Roaster.Reviewer.Tests</code></pre>
+
+<h3>Ports</h3>
+<table>
+<tr><th>Service</th><th>Port</th></tr>
+<tr><td>Frontend (nginx)</td><td>5094</td></tr>
+<tr><td>API</td><td>8080</td></tr>
+<tr><td>RabbitMQ Management</td><td>15672</td></tr>
+<tr><td>Postgres</td><td>5432</td></tr>
+<tr><td>Ollama</td><td>11434 (native, not containerized)</td></tr>
+</table>
+</section>
+
+<section id="architecture">
+<h2>2. Architecture</h2>
+
+<h3>System Diagram</h3>
+<div class="mermaid">
+flowchart LR
+    Browser["Browser (Blazor WASM)"] -->|HTTP| API["Roaster.Api"]
+    API -->|EF Core| PG[("PostgreSQL")]
+    API -->|publish event| MQ(["RabbitMQ"])
+    MQ -->|consume| Consumer["Roaster.Consumer"]
+    Consumer -->|EF Core| PG
+    Consumer -->|Semantic Kernel| Reviewer["Roaster.Reviewer"]
+    Reviewer -->|HTTP| Ollama[("Ollama (native, host)")]
+    Migration["Roaster.Migration (DbUp, one-shot)"] -->|SQL scripts| PG
+    Consumer -->|publish event| MQ
+    Browser -.->|poll| API
+</div>
+<p class="muted">Everything except Ollama runs in Docker. Ollama runs natively on the host for GPU/Apple Silicon acceleration — the Consumer reaches it via <code>host.docker.internal:11434</code>.</p>
+
+<h3>Request Lifecycle</h3>
+<div class="mermaid">
+sequenceDiagram
+    participant B as Browser
+    participant A as Roaster.Api
+    participant Q as RabbitMQ
+    participant C as Roaster.Consumer
+    participant R as Roaster.Reviewer (Ollama)
+
+    B->>A: POST /api/sessions
+    A-->>B: 201 SessionDto
+    B->>A: POST /api/submissions (code + language)
+    A->>A: Save Submission (Status=Submitted)
+    A->>Q: Publish SubmissionCreatedEvent
+    A-->>B: 202 Accepted
+    Q->>C: Consume event
+    C->>C: Status to Processing
+    C->>R: ReviewCodeAsync(files)
+    R-->>C: comments + summary per file
+    C->>C: Save Review + ReviewMetrics, Status to Completed
+    C->>Q: Publish ReviewCompletedEvent
+    loop every 3s
+        B->>A: GET /api/submissions/id/review
+        A-->>B: 204 not ready or 200 ready
+    end
+</div>
+
+<h3>Thread Replies</h3>
+<div class="mermaid">
+sequenceDiagram
+    participant B as Browser
+    participant A as Roaster.Api
+    participant Q as RabbitMQ
+    participant C as ThreadReplyService
+    participant R as Roaster.Reviewer (Ollama)
+
+    B->>A: POST lines/line/threads (reply text)
+    A->>A: Save ThreadReply (IsAiReply=false)
+    A->>Q: Publish ReplyEvent
+    Q->>C: Consume event
+    C->>C: Build chat history from prior replies
+    C->>R: ReplyToThreadAsync
+    R-->>C: plain-text reply
+    C->>C: Save ThreadReply (IsAiReply=true)
+    B->>A: GET /api/threads/id/replies
+    A-->>B: full conversation
+</div>
+
+<h3>Docker Compose Topology</h3>
+<div class="mermaid">
+flowchart TD
+    postgres["postgres:17-alpine"] --> migration["migration (DbUp, restart: no)"]
+    migration --> roasterapi["roaster-api :8080"]
+    rabbitmq["rabbitmq:4-management-alpine"] --> roasterapi
+    rabbitmq --> roasterconsumer["roaster-consumer"]
+    postgres --> roasterconsumer
+    roasterapi --> roasterfrontend["roaster-frontend :5094 (nginx)"]
+    ollama[("ollama (native, host.docker.internal:11434)")] -.-> roasterconsumer
+</div>
+
+<h3>Key Decisions</h3>
+<ul>
+<li><b>1 session : 1 live submission.</b> Resubmitting replaces the payload and drops the old review.</li>
+<li><b>Per-file AI review, not one giant prompt.</b> Each file gets its own Ollama call and context budget.</li>
+<li><b>Defensive JSON parsing, never throws.</b> Degrades through fallback stages instead of failing the whole review.</li>
+<li><b>Soft delete for sessions.</b> <code>IsActive</code> flag — audit <code>Event</code> rows always stay valid.</li>
+<li><b>CorrelationId = SessionId.</b> Stable identifier for grouping a session's full history.</li>
+</ul>
+</section>
+
+<section id="backend">
+<h2>3. Backend</h2>
+
+<h3>Projects</h3>
+<table>
+<tr><th>Project</th><th>SDK</th><th>Role</th></tr>
+<tr><td><b>Roaster.Api</b></td><td>Web</td><td>HTTP endpoints, service layer, validation, publishes events</td></tr>
+<tr><td><b>Roaster.Consumer</b></td><td>Worker</td><td>Consumes RabbitMQ messages, orchestrates review flow</td></tr>
+<tr><td><b>Roaster.Reviewer</b></td><td>Class Library</td><td><code>IAiReviewService</code> — Semantic Kernel + Ollama connector</td></tr>
+<tr><td><b>Roaster.Data</b></td><td>Class Library</td><td>EF Core <code>RoasterDbContext</code>, entity configs</td></tr>
+<tr><td><b>Roaster.Contracts</b></td><td>Class Library</td><td>Shared events/DTOs, no external dependencies</td></tr>
+<tr><td><b>Roaster.Migration</b></td><td>Console App</td><td>DbUp; runs table scripts then index scripts</td></tr>
+</table>
+
+<h3>API Endpoints</h3>
+<table>
+<tr><th>Method</th><th>Path</th><th>Returns</th><th>Notes</th></tr>
+<tr><td>POST</td><td><code>/api/sessions</code></td><td>201</td><td>Create session</td></tr>
+<tr><td>GET</td><td><code>/api/sessions</code></td><td>200</td><td><code>page</code>, <code>pageSize</code> query params</td></tr>
+<tr><td>GET</td><td><code>/api/sessions/{id}</code></td><td>200</td><td>Session + latest submission</td></tr>
+<tr><td>DELETE</td><td><code>/api/sessions/{id}</code></td><td>204</td><td>Soft delete</td></tr>
+<tr><td>POST</td><td><code>/api/submissions</code></td><td>202</td><td>Submit/resubmit code</td></tr>
+<tr><td>GET</td><td><code>/api/submissions/{id}</code></td><td>200</td><td>Single submission</td></tr>
+<tr><td>GET</td><td><code>/api/submissions/{id}/review</code></td><td>204 / 200</td><td>Poll until completed</td></tr>
+<tr><td>POST</td><td><code>/api/submissions/{subId}/reviews/{revId}/lines/{lineNum}/threads</code></td><td>202</td><td>Reply — creates thread if needed</td></tr>
+<tr><td>PATCH</td><td><code>/api/threads/{threadId}/resolve</code></td><td>204</td><td>Mark resolved</td></tr>
+<tr><td>GET</td><td><code>/api/threads/{threadId}/replies</code></td><td>200</td><td>Ordered conversation</td></tr>
+<tr><td>GET</td><td><code>/health</code></td><td>200 / 503</td><td>Postgres + RabbitMQ health</td></tr>
+</table>
+<p class="muted">OpenAPI/Scalar UI at <code>/scalar/v1</code> (development only).</p>
+
+<h3>Submission Flow</h3>
+<pre><code>POST /api/submissions
+  -> Validate (sessionId, code 1-50k chars, language enum), strip control chars
+  -> No existing submission  -> create (Status=Submitted)
+  -> Existing + Processing   -> 409 Conflict
+  -> Existing + other status -> replace Payload, reset Status=Submitted, drop old Review
+  -> Log Event(Submitted), publish SubmissionCreatedEvent -> 202 Accepted
+
+RabbitMQ "code-submitted" (PrefetchCount=1, ConcurrentMessageLimit=1)
+  -> CodeSubmittedConsumer: Status -> Processing -> Event(ProcessingStarted)
+  -> IAiReviewService.ReviewCodeAsync()
+  -> Success: save Review + ReviewMetrics + Event(ReviewCompleted), Status -> Completed
+  -> Parse failure: Status -> Failed, Event(Failed) with real parser error in Metadata
+  -> Exception: Status -> Failed, Event(Failed) with ex.Message, rethrow -> MassTransit retry</code></pre>
+
+<h3>Data Model Summary</h3>
+<table>
+<tr><th>Entity</th><th>PK</th><th>Notes</th></tr>
+<tr><td><code>Session</code></td><td>UUID</td><td>Soft delete; 1:1 with live <code>Submission</code></td></tr>
+<tr><td><code>Submission</code></td><td>bigserial</td><td>Unique <code>SessionId</code> FK; <code>Payloads</code> holds multiple files</td></tr>
+<tr><td><code>Review</code></td><td>bigserial</td><td>Written by the Consumer</td></tr>
+<tr><td><code>CommentThread</code></td><td>bigserial</td><td>Unique (ReviewId, LineNumber)</td></tr>
+<tr><td><code>ThreadReply</code></td><td>bigserial</td><td>User + AI messages</td></tr>
+<tr><td><code>Event</code></td><td>bigserial</td><td>Audit log — viewable in the Events page</td></tr>
+<tr><td><code>ReviewMetrics</code></td><td>bigserial</td><td>Latency + token telemetry</td></tr>
+</table>
+
+<h3>Key Patterns</h3>
+<ul>
+<li><b>Service layer.</b> One service per resource; services return <code>ServiceResult&lt;T&gt;</code> (implements <code>IResult</code>).</li>
+<li><b>JSONB owned types.</b> <code>Submission.Payloads</code>, <code>Review.Comments</code>, <code>Event.Metadata</code>.</li>
+<li><b>MassTransit retry.</b> <code>CodeSubmittedConsumer</code>: exponential (3x, 10s-120s). <code>UserThreadReplyConsumer</code>: fixed [3s, 10s, 30s].</li>
+<li><b>AI JSON parsing never throws.</b> 4 fallback stages before giving up; the real parser error (or context-length-exceeded hint) lands in the <code>Failed</code> event's Metadata.</li>
+</ul>
+
+<h3>Configuration</h3>
+<pre><code>// Roaster.Consumer
+{
+  "Ollama": { "Endpoint": "http://localhost:11434", "ModelId": "qwen2.5-coder:3b", "ContextLength": 8096 }
+}</code></pre>
+<p class="muted"><code>Ollama:ContextLength</code> maps to Ollama's <code>num_ctx</code> — the token budget shared by prompt and response. Overridable via <code>OLLAMA_CONTEXT_LENGTH</code>.</p>
+
+<h3>Test Conventions</h3>
+<p>xUnit + Moq + FluentAssertions, no real broker or database — <code>Roaster.Api.Tests</code> uses <code>WebApplicationFactory</code> + EF InMemory; <code>Roaster.Consumer.Tests</code> uses a fake consume context; <code>Roaster.Reviewer.Tests</code> covers parser fallback stages; <code>Roaster.Data.Tests</code> covers EF configuration.</p>
+</section>
+
+<section id="frontend">
+<h2>4. Frontend (Roaster.Editor)</h2>
+<p>Blazor <b>WebAssembly</b> (.NET 10), runs entirely in the browser. API base URL: <code>wwwroot/appsettings.json</code> → <code>Api:BaseUrl</code>.</p>
+
+<h3>Structure</h3>
+<pre><code>src/Roaster.Editor/
+├── Pages/
+│   ├── Index.razor      "/"                session dashboard, owns all action handlers
+│   ├── Session.razor    "/session/{Id}"    session detail + Code editor
+│   └── Events.razor     "/events"          audit log, JsonViewer for metadata
+├── Components/
+│   ├── Code.razor       Monaco wrapper — submit, poll, overlay review comments
+│   ├── Comment.razor    inline comment: severity badge, collapse, reply thread
+│   ├── JsonViewer.razor generic JSON tree viewer
+│   └── SessionView.razor MudDataGrid of sessions
+├── Shared/  NewSessionDialog.razor · EditorComponentBase.cs
+├── Layout/MainLayout.razor      shell, dark/light toggle, fixed-height flex content area
+├── Services/  SessionService · SubmissionService · ReviewService · CodeUtils · ThemeFactory
+└── wwwroot/reviewZones.js       Monaco ViewZone + overlay positioning interop</code></pre>
+
+<h3>Review Flow</h3>
+<div class="mermaid">
+flowchart TD
+    A["Click Review"] --> B["SubmissionService.SubmitAsync"]
+    B --> C["Start polling (3s interval)"]
+    C --> D{"GET review status"}
+    D -->|204| C
+    D -->|200| E["ApplyReview: populate comment refs"]
+    D -->|error| F["Snackbar error"]
+    E --> G["OnAfterRenderAsync: inject Monaco ViewZones + glyph decorations"]
+    G --> H["SyncOverlayAsync: position comment divs over editor"]
+</div>
+
+<p><b>Overlay architecture.</b> Comment components render in a sibling <code>&lt;div&gt;</code> positioned absolutely over Monaco. ViewZones create invisible gutter spacers; <code>RoasterReview.syncOverlay</code> positions each comment by reading <code>getTopForLineNumber()</code> / <code>getScrollTop()</code>. Wheel events on the overlay forward to Monaco.</p>
+
+<h3>Services</h3>
+<table>
+<tr><th>Service</th><th>Calls</th></tr>
+<tr><td><code>SessionService</code></td><td>GET list/by-id, POST, DELETE <code>/api/sessions</code></td></tr>
+<tr><td><code>SubmissionService</code></td><td>POST <code>/api/submissions</code></td></tr>
+<tr><td><code>ReviewService</code></td><td>GET review, POST reply, GET replies, PATCH resolve</td></tr>
+</table>
+
+<h3>Conventions</h3>
+<ul>
+<li>MudBlazor bindings: <code>@bind-Value</code> + <code>@bind-Value:after</code>.</li>
+<li>Child components emit <code>EventCallback&lt;T&gt;</code> only — no decision logic in children.</li>
+<li>All editor JS interop goes through <code>CodeUtils</code> static methods.</li>
+<li>UI libraries: MudBlazor 9.4.0, BlazorMonaco 3.4.0 — no CDN dependencies.</li>
+</ul>
+</section>
+
+<section id="ai-pipeline">
+<h2>5. AI Pipeline</h2>
+<p><code>Roaster.Reviewer</code> — <code>AiReviewService</code> — talks to a local Ollama model through Semantic Kernel's <code>IChatCompletionService</code>. Code is reviewed <b>one file at a time</b>, using one of two fixed system prompts. No agent framework, planner, tool use, or memory store — two prompt <i>personas</i> sharing one call mechanism.</p>
+
+<h3>Initial Review — Per-File Loop</h3>
+<div class="mermaid">
+flowchart TD
+    A["files: list of CodeFileInput"] --> B["For each file"]
+    B --> C["Render file-message template (fileName, language, numbered lines)"]
+    C --> D["ChatHistory = roaster.txt + file message"]
+    D --> E["Ollama call (num_ctx = ContextLength)"]
+    E --> F["ReviewResponseParser.Parse"]
+    F -->|parsed| G["Pool comments + summary"]
+    F -->|failed| H["Record per-file error, skip"]
+    G --> I{"More files?"}
+    H --> I
+    I -->|yes| B
+    I -->|no| J{"Any file parsed OK?"}
+    J -->|yes| K["Status = Success"]
+    J -->|no| L["Status = Failed, Error = joined per-file reasons"]
+</div>
+
+<p>Each file is judged in isolation — bounds the context-overflow risk to a single file's size instead of the whole submission's, at the cost of cross-file reasoning.</p>
+
+<p><b>Line numbering.</b> Content is split into lines, each prefixed with its 1-indexed number before being sent — this is the entire reason the model returns accurate line numbers; it echoes numbers it was shown, not values it computes.</p>
+
+<p><b>roaster.txt persona.</b> Senior engineer, sarcastic. Must return only JSON: <code>summary</code> + <code>comments[]</code> (fileName, lineNumber, comment, severity). Severity: 10 = should-fix, 20 = must-fix.</p>
+
+<h3>Context Length (num_ctx)</h3>
+<p>Every call passes <code>num_ctx = ContextLength</code>. Default <b>8096</b> (<code>OLLAMA_CONTEXT_LENGTH</code> in Docker Compose, <code>appsettings.json</code> for local dev). This budget is shared by the prompt (system prompt + one file's numbered content) and the response. <code>qwen2.5-coder</code> models natively support up to 32,768 tokens — the ceiling here is a deliberate memory/quality tradeoff, not a model limit.</p>
+<p>If a file's content pushes the prompt at/over <code>ContextLength</code>, Ollama truncates silently. <code>AiReviewService</code> detects this and prefixes the per-file error with a context-exceeded hint, so a truncation failure reads differently from a genuine malformed-JSON failure in the Events UI.</p>
+
+<h3>Defensive JSON Parsing</h3>
+<p><code>ReviewResponseParser.Parse</code> — 4-stage fallback, never throws:</p>
+<ol>
+<li>Direct <code>JsonSerializer.Deserialize</code>.</li>
+<li>Strip a markdown JSON fence via regex, retry.</li>
+<li>Substring from first <code>{</code> to last <code>}</code>, retry.</li>
+<li>Escape raw newlines/tabs found inside string literals, retry.</li>
+</ol>
+<p>On total failure: the real <code>JsonException</code> message + a raw-response snippet becomes <code>ReviewerResult.Error</code>, which flows into the <code>Event(Failed)</code> row's Metadata — visible in the UI, not a generic placeholder.</p>
+
+<h3>Thread Replies — Second Persona</h3>
+<pre><code>code            = ALL files in the submission, joined together
+originalComment = the review comment that started this thread
+priorHistory    = every prior ThreadReply, oldest first
+userMessage     = the newest reply
+
+ChatHistory(replier.txt)
+  + "Code: {code} / Original comment: {originalComment}"
+  + assistant(originalComment)
+  + priorHistory (user/assistant alternating)
+  + user(userMessage)
+-> Ollama -> plain-text reply (no JSON, no parsing)</code></pre>
+<p class="muted">Known limitation: <code>code</code> is every file in the submission concatenated, not just the file the comment is in — a multi-file submission resends its full code on every reply.</p>
+
+<h3>"How many agents?"</h3>
+<p>Two system-prompt <i>configurations</i>, not two autonomous agents. Neither calls tools/functions, runs a planning loop, or maintains memory beyond the explicit chat history passed in. All decision logic lives in application code.</p>
+
+<h3>Tool-Calling — Tried and Shelved</h3>
+<p>Real function-calling was tested against <code>qwen2.5-coder:3b</code> and <code>deepseek-coder:1.3b</code>: both raw Ollama <code>tools</code> arrays and Semantic Kernel's <code>FunctionChoiceBehavior.Auto()</code> produced function-call-shaped text, never an actual invocation. Not usable with these models — cross-file retrieval was shelved rather than half-built.</p>
+</section>
+
+<section id="data-model">
+<h2>6. Data Model</h2>
+
+<div class="mermaid">
+erDiagram
+    SESSION ||--o| SUBMISSION : "1 to 1"
+    SUBMISSION ||--o| REVIEW : "1 to 1"
+    REVIEW ||--o{ COMMENTTHREAD : "1 to N"
+    COMMENTTHREAD ||--o{ THREADREPLY : "1 to N"
+    SUBMISSION ||--o{ EVENT : "1 to N"
+    REVIEW ||--o| REVIEWMETRICS : "1 to 1"
+
+    SESSION {
+        uuid Id PK
+        varchar Name
+        timestamp CreatedAt
+        bool IsActive
+    }
+    SUBMISSION {
+        bigint Id PK
+        uuid SessionId FK
+        jsonb Payloads
+        smallint Status
+    }
+    REVIEW {
+        bigint Id PK
+        bigint SubmissionId FK
+        text Summary
+        jsonb Comments
+    }
+    COMMENTTHREAD {
+        bigint Id PK
+        bigint ReviewId FK
+        int LineNumber
+        smallint Status
+    }
+    THREADREPLY {
+        bigint Id PK
+        bigint ThreadId FK
+        text Content
+        bool IsAiReply
+    }
+    EVENT {
+        bigint Id PK
+        bigint SubmissionId FK
+        uuid SessionId
+        smallint EventType
+        uuid CorrelationId
+        jsonb Metadata
+    }
+    REVIEWMETRICS {
+        bigint Id PK
+        bigint ReviewId FK
+        varchar ModelId
+        int QueueWaitMs
+        int ReviewDurationMs
+    }
+</div>
+
+<h3>Enum Values (all smallint)</h3>
+<table>
+<tr><th>Enum</th><th>Values</th></tr>
+<tr><td><code>SubmissionStatus</code></td><td>10=Submitted, 20=Processing, 30=Completed, 40=Failed</td></tr>
+<tr><td><code>ThreadStatus</code></td><td>10=Unresolved (default), 20=Resolved</td></tr>
+<tr><td><code>ReviewSeverity</code></td><td>10=Gentle, 20=Medium, 30=Brutal</td></tr>
+<tr><td><code>EventType</code></td><td>10=Submitted, 20=ProcessingStarted, 30=ReviewCompleted, 40=Failed, 50=UserReplied, 60=AiReplied</td></tr>
+</table>
+
+<h3>JSONB Owned Types</h3>
+<ul>
+<li><code>Submission.Payloads</code> → list of <code>{FileName, Content, Language}</code> — one entry per file.</li>
+<li><code>Review.Comments</code> → list of <code>{FileName, LineNumber, Comment, Severity}</code>.</li>
+<li><code>Event.Metadata</code> → arbitrary JSON — token usage on success, real parser/exception error on failure. Rendered via <code>JsonViewer.razor</code>.</li>
+</ul>
+</section>
+
+<section id="running">
+<h2>7. Running the Project</h2>
+
+<h3>Prerequisites</h3>
+<ul>
+<li>.NET 10 SDK</li>
+<li>Docker Desktop</li>
+<li>Ollama installed natively on the host</li>
+</ul>
+
+<h3>Steps</h3>
+<pre><code># 1. Start Ollama and pull the model
+ollama serve
+ollama pull qwen2.5-coder:3b
+
+# 2. (Optional) .env at repo root
+POSTGRES_PASSWORD=yourpassword
+RABBITMQ_PASSWORD=yourpassword
+OLLAMA_MODEL=qwen2.5-coder:3b
+OLLAMA_CONTEXT_LENGTH=8096
+
+# 3. Build and start
+make up          # detached
+make up a=1      # attached, streams logs</code></pre>
+
+<h3>Verify</h3>
+<table>
+<tr><th>Service</th><th>URL</th></tr>
+<tr><td>Frontend</td><td>http://localhost:5094</td></tr>
+<tr><td>API Health</td><td>http://localhost:8080/health</td></tr>
+<tr><td>API Docs (Scalar)</td><td>http://localhost:8080/scalar/v1</td></tr>
+<tr><td>RabbitMQ Management</td><td>http://localhost:15672</td></tr>
+</table>
+
+<h3>Local Development</h3>
+<pre><code>docker run -d --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:17-alpine
+docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:4-management-alpine
+
+dotnet run --project src/Roaster.Migration -- "Host=localhost;Database=roaster;Username=postgres;Password=postgres"
+
+make api       # Roaster.Api
+make consumer  # Roaster.Consumer
+make editor    # Roaster.Editor</code></pre>
+
+<h3>Build & Test</h3>
+<pre><code>dotnet build
+dotnet test
+dotnet test tests/Roaster.Api.Tests --filter "SubmissionEndpointTests"</code></pre>
+
+<h3>Switching the AI Model</h3>
+<table>
+<tr><th>Model</th><th>Size</th><th>Notes</th></tr>
+<tr><td><code>qwen2.5-coder:3b</code></td><td>~2.0 GB</td><td>Default</td></tr>
+<tr><td><code>deepseek-coder:1.3b</code></td><td>~2.5 GB</td><td>Fastest, lowest quality</td></tr>
+<tr><td><code>qwen2.5-coder:7b</code></td><td>~4.7 GB</td><td>Better quality, needs 8 GB+ RAM</td></tr>
+<tr><td><code>deepseek-coder-v2:16b</code></td><td>~9.1 GB</td><td>Highest quality, needs 16 GB+ RAM</td></tr>
+</table>
+</section>
+
+</main>
+
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: "dark" });
+</script>
+</body>
+</html>

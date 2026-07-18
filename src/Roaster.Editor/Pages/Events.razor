@@ -3,7 +3,7 @@
 @implements IDisposable
 @inject EventService EventService
 
-<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pa-4">
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pa-4" Style="height:100%; overflow-y:auto; box-sizing:border-box;">
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
         <MudText Typo="Typo.h5">Event Log</MudText>
         <MudSwitch T="bool" @bind-Value="@_live" @bind-Value:after="OnLiveToggled" Color="Color.Success" Label="Live" />

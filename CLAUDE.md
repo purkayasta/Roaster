@@ -2,13 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Detailed documentation lives in `Documentations/`:
-- **[BACKEND.md](Documentations/BACKEND.md)** — data flow, endpoints, data model, patterns, config, tests
-- **[FRONTEND.md](Documentations/FRONTEND.md)** — Blazor WASM structure, components, services, conventions
-- **[RUNNING.md](Documentations/RUNNING.md)** — local setup, Docker Compose, migrations, test commands
-
-Root-level docs:
-- **[AI-MINDMAP.md](AI-MINDMAP.md)** — deep dive into the AI/Ollama review pipeline: per-file chunking, the two prompt personas (review vs. reply), defensive JSON parsing, `num_ctx` config, and why tool-calling was tried and shelved. Includes a Mermaid system-flow diagram.
+Detailed documentation lives in `Documentations/` (also viewable as one page: `Documentations/index.html`):
+- **[01-overview.md](Documentations/01-overview.md)** — stack, solution structure, ports
+- **[02-architecture.md](Documentations/02-architecture.md)** — system diagram, request lifecycle, key decisions
+- **[03-backend.md](Documentations/03-backend.md)** — endpoints, data flow, patterns, config, tests
+- **[04-frontend.md](Documentations/04-frontend.md)** — Blazor WASM structure, components, services, conventions
+- **[05-ai-pipeline.md](Documentations/05-ai-pipeline.md)** — per-file chunking, the two prompt personas, defensive JSON parsing, `num_ctx`, tool-calling shelved
+- **[06-data-model.md](Documentations/06-data-model.md)** — entities, enums, ER diagram
+- **[07-running.md](Documentations/07-running.md)** — local setup, Docker Compose, migrations, test commands
 
 ---
 
